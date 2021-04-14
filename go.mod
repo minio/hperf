@@ -1,4 +1,4 @@
-module github.com/krishnasrinivas/meshthroughput
+module github.com/krishnasrinivas/mesh-throughput
 
 go 1.15
 
