@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -19,18 +17,27 @@ var port = "9999"
 
 var uniqueStr = uuid.New().String()
 
+var dataIn uint64
 var dataOut uint64
 
 func printDataOut() {
 	for {
 		time.Sleep(time.Second)
+		lastDataIn := atomic.SwapUint64(&dataIn, 0)
 		lastDataOut := atomic.SwapUint64(&dataOut, 0)
-		fmt.Println("Bandwidth (per second): ", humanize.Bytes(lastDataOut))
+		fmt.Printf("Bandwidth (per second):  %s in  |  %s out\n", humanize.Bytes(lastDataIn), humanize.Bytes(lastDataOut))
 	}
 }
 
 func handleRequest(conn net.Conn) {
-	io.Copy(ioutil.Discard, conn)
+	b := make([]byte, 1024*0124)
+	for {
+		n, err := conn.Read(b)
+		if err != nil {
+			break
+		}
+		atomic.AddUint64(&dataIn, uint64(n))
+	}
 	conn.Close()
 }
 
