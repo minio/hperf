@@ -25,7 +25,7 @@ func printDataOut() {
 		time.Sleep(time.Second)
 		lastDataIn := atomic.SwapUint64(&dataIn, 0)
 		lastDataOut := atomic.SwapUint64(&dataOut, 0)
-		fmt.Printf("Bandwidth (per second):  %s in  |  %s out\n", humanize.Bytes(lastDataIn), humanize.Bytes(lastDataOut))
+		fmt.Printf("Bandwidth:  %s/s RX  |  %s/s TX\n", humanize.Bytes(lastDataIn), humanize.Bytes(lastDataOut))
 	}
 }
 
