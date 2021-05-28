@@ -1,10 +1,10 @@
-# meshthroughput
-meshthroughput
+# mesh-throughput
+mesh-throughput
 
 Run it like:
 
 ```
-meshthroughput IP1 IP2 IP3 ...
+mesh-throughput IP1 IP2 IP3 ...
 ```
 
 on all the servers IP1 IP2 IP3 ...
