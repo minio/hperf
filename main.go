@@ -17,6 +17,8 @@ var port = "9999"
 
 var uniqueStr = uuid.New().String()
 
+var oneMB = 1024 * 1024
+
 var dataIn uint64
 var dataOut uint64
 
@@ -30,7 +32,7 @@ func printDataOut() {
 }
 
 func handleRequest(conn net.Conn) {
-	b := make([]byte, 1024*0124)
+	b := make([]byte, oneMB)
 	for {
 		n, err := conn.Read(b)
 		if err != nil {
@@ -60,7 +62,7 @@ func runServer() {
 
 func runClient(host string) {
 	host = host + ":" + port
-	b := make([]byte, 1024*0124)
+	b := make([]byte, oneMB)
 	for {
 		conn, err := net.Dial("tcp", host)
 		if err != nil {
@@ -75,7 +77,7 @@ func runClient(host string) {
 				fmt.Println(host, ": disconnected")
 				break
 			}
-			atomic.AddUint64(&dataOut, uint64(1024*0124))
+			atomic.AddUint64(&dataOut, uint64(oneMB))
 		}
 	}
 	for i := 0; i < 16; i++ {
@@ -92,7 +94,7 @@ func runClient(host string) {
 						conn.Close()
 						break
 					}
-					atomic.AddUint64(&dataOut, uint64(1024*0124))
+					atomic.AddUint64(&dataOut, uint64(oneMB))
 				}
 			}
 		}()
