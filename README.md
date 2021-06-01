@@ -1,5 +1,4 @@
 # mesh-throughput
-mesh-throughput
 
 Run it like:
 
