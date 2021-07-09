@@ -19,8 +19,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -49,13 +47,27 @@ func printDataOut() {
 	}
 }
 
-func handleRequest(conn net.Conn) {
+func handleTX(conn net.Conn, b []byte) error {
 	defer conn.Close()
-	n, err := io.Copy(ioutil.Discard, conn)
-	if err != nil {
-		return
+	for {
+		n, err := conn.Write(b)
+		if err != nil {
+			return err
+		}
+		atomic.AddUint64(&dataOut, uint64(n))
 	}
-	atomic.AddUint64(&dataIn, uint64(n))
+}
+
+func handleRX(conn net.Conn) {
+	defer conn.Close()
+	b := make([]byte, oneMB)
+	for {
+		n, err := conn.Read(b)
+		if err != nil {
+			return
+		}
+		atomic.AddUint64(&dataIn, uint64(n))
+	}
 }
 
 func runServer() {
@@ -71,7 +83,7 @@ func runServer() {
 			log.Fatal(err)
 		}
 		// Handle connections in a new goroutine.
-		go handleRequest(conn)
+		go handleRX(conn)
 	}
 }
 
@@ -85,34 +97,9 @@ func runClient(host string) {
 			continue
 		}
 		fmt.Println(host, ": connected")
-		for {
-			n, err := conn.Write(b)
-			if err != nil {
-				conn.Close()
-				fmt.Println(host, ": disconnected")
-				break
-			}
-			atomic.AddUint64(&dataOut, uint64(n))
+		if err := handleTX(conn, b); err != nil {
+			fmt.Println(host, ": disconnected")
 		}
-	}
-	for i := 0; i < 16; i++ {
-		go func() {
-			for {
-				conn, err := net.Dial("tcp", host)
-				if err != nil {
-					time.Sleep(time.Second)
-					continue
-				}
-				for {
-					n, err := conn.Write(b)
-					if err != nil {
-						conn.Close()
-						break
-					}
-					atomic.AddUint64(&dataOut, uint64(n))
-				}
-			}
-		}()
 	}
 }
 
