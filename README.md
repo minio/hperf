@@ -2,10 +2,15 @@
 
 Mesh throughput tool performs N peers to N peers cross network benchmark measuring RX/TX bandwidth for each peers.
 
+## Download
+
+[Download Binary Releases](https://github.com/minio/warp/releases) for various platforms.
+
 ## Usecases
 - Calculate baseline RX/TX
 - Debug TOR Switch bottlenecks
 
+## Usage
 ```
 ./mesh-throughput IP1 IP2 IP3 ...
 ...
