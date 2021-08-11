@@ -4,7 +4,7 @@ Mesh throughput tool performs N peers to N peers cross network benchmark measuri
 
 ## Download
 
-[Download Binary Releases](https://github.com/minio/warp/releases) for various platforms.
+[Download Binary Releases](https://github.com/minio/mesh-throughput/releases) for various platforms.
 
 ## Usecases
 - Calculate baseline RX/TX
