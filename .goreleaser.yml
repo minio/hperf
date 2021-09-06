@@ -43,7 +43,7 @@ nfpms:
     vendor: MinIO, Inc.
     homepage: https://github.com/minio/mesh-throughput
     maintainer: MinIO Development <dev@min.io>
-    description: SideKick is a high-performance sidecar load-balancer.
+    description: Mesh throughput tool performs N peers to N peers cross network benchmark measuring RX/TX bandwidth for each peers
     license: GNU Affero General Public License v3.0
     formats:
       - deb
@@ -66,7 +66,7 @@ changelog:
 
 dockers:
 - image_templates:
-  - "minio/mesh-throughput:{{ .Tag }}-amd64"
+  - "quay.io/minio/mesh-throughput:{{ .Tag }}-amd64"
   use_buildx: true
   dockerfile: Dockerfile
   extra_files:
@@ -75,7 +75,7 @@ dockers:
   build_flag_templates:
   - "--platform=linux/amd64"
 - image_templates:
-  - "minio/mesh-throughput:{{ .Tag }}-ppc64le"
+  - "quay.io/minio/mesh-throughput:{{ .Tag }}-ppc64le"
   use_buildx: true
   dockerfile: Dockerfile
   extra_files:
@@ -84,7 +84,7 @@ dockers:
   build_flag_templates:
   - "--platform=linux/ppc64le"
 - image_templates:
-  - "minio/mesh-throughput:{{ .Tag }}-s390x"
+  - "quay.io/minio/mesh-throughput:{{ .Tag }}-s390x"
   use_buildx: true
   dockerfile: Dockerfile
   extra_files:
@@ -93,7 +93,7 @@ dockers:
   build_flag_templates:
   - "--platform=linux/s390x"
 - image_templates:
-  - "minio/mesh-throughput:{{ .Tag }}-arm64"
+  - "quay.io/minio/mesh-throughput:{{ .Tag }}-arm64"
   use_buildx: true
   goarch: arm64
   dockerfile: Dockerfile
@@ -103,15 +103,15 @@ dockers:
   build_flag_templates:
   - "--platform=linux/arm64"
 docker_manifests:
-- name_template: minio/mesh-throughput:{{ .Tag }}
+- name_template: quay.io/minio/mesh-throughput:{{ .Tag }}
   image_templates:
-  - minio/mesh-throughput:{{ .Tag }}-amd64
-  - minio/mesh-throughput:{{ .Tag }}-arm64
-  - minio/mesh-throughput:{{ .Tag }}-ppc64le
-  - minio/mesh-throughput:{{ .Tag }}-s390x
-- name_template: minio/mesh-throughput:latest
+  - quay.io/minio/mesh-throughput:{{ .Tag }}-amd64
+  - quay.io/minio/mesh-throughput:{{ .Tag }}-arm64
+  - quay.io/minio/mesh-throughput:{{ .Tag }}-ppc64le
+  - quay.io/minio/mesh-throughput:{{ .Tag }}-s390x
+- name_template: quay.io/minio/mesh-throughput:latest
   image_templates:
-  - minio/mesh-throughput:{{ .Tag }}-amd64
-  - minio/mesh-throughput:{{ .Tag }}-arm64
-  - minio/mesh-throughput:{{ .Tag }}-ppc64le
-  - minio/mesh-throughput:{{ .Tag }}-s390x
+  - quay.io/minio/mesh-throughput:{{ .Tag }}-amd64
+  - quay.io/minio/mesh-throughput:{{ .Tag }}-arm64
+  - quay.io/minio/mesh-throughput:{{ .Tag }}-ppc64le
+  - quay.io/minio/mesh-throughput:{{ .Tag }}-s390x
