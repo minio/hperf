@@ -22,6 +22,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -90,17 +92,23 @@ func runServer() {
 func runClient(host string) {
 	host = host + ":" + port
 	b := make([]byte, oneMB)
-	for {
+	proc := runtime.GOMAXPROCS(0) / 2
+	var wg sync.WaitGroup
+	wg.Add(proc)
+	for i := 0; i < proc; i++ {
 		conn, err := net.Dial("tcp", host)
 		if err != nil {
 			time.Sleep(time.Second)
 			continue
 		}
-		fmt.Println(host, ": connected")
-		if err := handleTX(conn, b); err != nil {
-			fmt.Println(host, ": disconnected")
-		}
+		go func() {
+			defer wg.Done()
+			if err := handleTX(conn, b); err != nil {
+				panic(err)
+			}
+		}()
 	}
+	wg.Wait()
 }
 
 func main() {
