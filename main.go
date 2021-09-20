@@ -22,7 +22,9 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"runtime"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -31,7 +33,22 @@ import (
 	"github.com/google/uuid"
 )
 
-var port = "9999"
+var port = func() string {
+	p := os.Getenv("MESH_PORT")
+	if p == "" {
+		p = "9999"
+	}
+	return p
+}()
+
+var selfDetectPort = func() string {
+	sp, err := strconv.Atoi(port)
+	if err != nil {
+		log.Fatal(err)
+	}
+	sp++
+	return strconv.Itoa(sp)
+}()
 
 var uniqueStr = uuid.New().String()
 
@@ -126,7 +143,7 @@ func main() {
 	}
 
 	s := &http.Server{
-		Addr:           ":10000",
+		Addr:           ":" + selfDetectPort,
 		MaxHeaderBytes: 1 << 20,
 	}
 
@@ -140,7 +157,7 @@ func main() {
 	go runServer()
 	go printDataOut()
 	for host := range hostMap {
-		resp, err := http.Get("http://" + host + ":10000/" + uniqueStr)
+		resp, err := http.Get("http://" + host + ":" + selfDetectPort + "/" + uniqueStr)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			resp.Body.Close() // close the connection.
 			s.Close()         // close the server as we are done.
