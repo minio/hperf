@@ -40,6 +40,7 @@ var port = func() string {
 	}
 	return p
 }()
+
 var selfDetectPort = func() string {
 	sp, err := strconv.Atoi(port)
 	if err != nil {
