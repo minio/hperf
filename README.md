@@ -1,6 +1,6 @@
 # mperf
 
-Mesh throughput tool performs N peers to N peers cross network benchmark measuring RX/TX bandwidth for each peers.
+mperf is a tool for active measurements of the maximum achievable bandwidth between N peers, measuring RX/TX bandwidth for each peers.
 
 ## Download
 
