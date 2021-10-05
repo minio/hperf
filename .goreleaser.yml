@@ -1,11 +1,11 @@
-project_name: mesh-throughput
+project_name: mperf
 
 release:
    name_template: "Release version {{.Version}}"
 
    github:
     owner: minio
-    name: mesh-throughput
+    name: mperf
 
 before:
   hooks:
@@ -41,7 +41,7 @@ archives:
 nfpms:
   -
     vendor: MinIO, Inc.
-    homepage: https://github.com/minio/mesh-throughput
+    homepage: https://github.com/minio/mperf
     maintainer: MinIO Development <dev@min.io>
     description: Mesh throughput tool performs N peers to N peers cross network benchmark measuring RX/TX bandwidth for each peers
     license: GNU Affero General Public License v3.0
@@ -66,7 +66,7 @@ changelog:
 
 dockers:
 - image_templates:
-  - "quay.io/minio/mesh-throughput:{{ .Tag }}-amd64"
+  - "quay.io/minio/mperf:{{ .Tag }}-amd64"
   use: buildx
   dockerfile: Dockerfile
   extra_files:
@@ -75,7 +75,7 @@ dockers:
   build_flag_templates:
   - "--platform=linux/amd64"
 - image_templates:
-  - "quay.io/minio/mesh-throughput:{{ .Tag }}-ppc64le"
+  - "quay.io/minio/mperf:{{ .Tag }}-ppc64le"
   use: buildx
   dockerfile: Dockerfile
   extra_files:
@@ -84,7 +84,7 @@ dockers:
   build_flag_templates:
   - "--platform=linux/ppc64le"
 - image_templates:
-  - "quay.io/minio/mesh-throughput:{{ .Tag }}-s390x"
+  - "quay.io/minio/mperf:{{ .Tag }}-s390x"
   use: buildx
   dockerfile: Dockerfile
   extra_files:
@@ -93,7 +93,7 @@ dockers:
   build_flag_templates:
   - "--platform=linux/s390x"
 - image_templates:
-  - "quay.io/minio/mesh-throughput:{{ .Tag }}-arm64"
+  - "quay.io/minio/mperf:{{ .Tag }}-arm64"
   use: buildx
   goarch: arm64
   dockerfile: Dockerfile
@@ -103,15 +103,15 @@ dockers:
   build_flag_templates:
   - "--platform=linux/arm64"
 docker_manifests:
-- name_template: quay.io/minio/mesh-throughput:{{ .Tag }}
+- name_template: quay.io/minio/mperf:{{ .Tag }}
   image_templates:
-  - quay.io/minio/mesh-throughput:{{ .Tag }}-amd64
-  - quay.io/minio/mesh-throughput:{{ .Tag }}-arm64
-  - quay.io/minio/mesh-throughput:{{ .Tag }}-ppc64le
-  - quay.io/minio/mesh-throughput:{{ .Tag }}-s390x
-- name_template: quay.io/minio/mesh-throughput:latest
+  - quay.io/minio/mperf:{{ .Tag }}-amd64
+  - quay.io/minio/mperf:{{ .Tag }}-arm64
+  - quay.io/minio/mperf:{{ .Tag }}-ppc64le
+  - quay.io/minio/mperf:{{ .Tag }}-s390x
+- name_template: quay.io/minio/mperf:latest
   image_templates:
-  - quay.io/minio/mesh-throughput:{{ .Tag }}-amd64
-  - quay.io/minio/mesh-throughput:{{ .Tag }}-arm64
-  - quay.io/minio/mesh-throughput:{{ .Tag }}-ppc64le
-  - quay.io/minio/mesh-throughput:{{ .Tag }}-s390x
+  - quay.io/minio/mperf:{{ .Tag }}-amd64
+  - quay.io/minio/mperf:{{ .Tag }}-arm64
+  - quay.io/minio/mperf:{{ .Tag }}-ppc64le
+  - quay.io/minio/mperf:{{ .Tag }}-s390x

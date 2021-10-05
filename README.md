@@ -1,10 +1,10 @@
-# mesh-throughput
+# mperf
 
 Mesh throughput tool performs N peers to N peers cross network benchmark measuring RX/TX bandwidth for each peers.
 
 ## Download
 
-[Download Binary Releases](https://github.com/minio/mesh-throughput/releases) for various platforms.
+[Download Binary Releases](https://github.com/minio/mperf/releases) for various platforms.
 
 ## Usecases
 - Calculate baseline RX/TX
@@ -12,7 +12,7 @@ Mesh throughput tool performs N peers to N peers cross network benchmark measuri
 
 ## Usage
 ```
-./mesh-throughput IP1 IP2 IP3 ...
+./mperf IP1 IP2 IP3 ...
 ...
 Bandwidth: 1.2 GB/s RX | 1.0 GB/s TX
 Bandwidth: 1.2 GB/s RX | 1.1 GB/s TX
@@ -23,4 +23,4 @@ Bandwidth: 1.2 GB/s RX | 944 MB/s TX
 on all the servers IP1 IP2 IP3 ... respectively.
 
 ### LICENSE
-Use of `mesh-throughput` tool is governed by the GNU AGPLv3 license that can be found in the [LICENSE](./LICENSE) file.
+Use of `mperf` tool is governed by the GNU AGPLv3 license that can be found in the [LICENSE](./LICENSE) file.

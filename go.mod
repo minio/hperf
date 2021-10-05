@@ -1,4 +1,4 @@
-module github.com/minio/mesh-throughput
+module github.com/minio/mperf
 
 go 1.16
 
