@@ -23,7 +23,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"runtime"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -109,7 +108,7 @@ func runServer() {
 func runClient(host string) {
 	host = host + ":" + port
 	b := make([]byte, oneMB)
-	proc := runtime.GOMAXPROCS(0) / 2
+	proc := 16 // 16 TCP connections is more than enough to saturate a 100G link.
 	var wg sync.WaitGroup
 	wg.Add(proc)
 	for i := 0; i < proc; i++ {
