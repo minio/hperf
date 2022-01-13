@@ -1,0 +1,63 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mperf
+  labels:
+    app: mperf
+spec:
+  publishNotReadyAddresses: true
+  clusterIP: None
+  ports:
+    - port: 9999
+      name: http1
+    - port: 10000
+      name: http2
+  selector:
+    app: mperf
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mperf
+  labels:
+    app: mperf
+spec:
+  serviceName: mperf
+  podManagementPolicy: Parallel
+  replicas: 6
+  selector:
+    matchLabels:
+      app: mperf
+  template:
+    metadata:
+      name: mperf
+      labels:
+        app: mperf
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - mperf
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+        - name: mperf
+          image: "quay.io/minio/mperf"
+          imagePullPolicy: Always
+          args:
+            - mperf-0.mperf.${NAMESPACE}.svc.cluster.local
+            - mperf-1.mperf.${NAMESPACE}.svc.cluster.local
+            - mperf-2.mperf.${NAMESPACE}.svc.cluster.local
+            - mperf-3.mperf.${NAMESPACE}.svc.cluster.local
+            - mperf-4.mperf.${NAMESPACE}.svc.cluster.local
+            - mperf-5.mperf.${NAMESPACE}.svc.cluster.local
+          ports:
+            - name: http1
+              containerPort: 9999
+            - name: http2
+              containerPort: 10000

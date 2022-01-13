@@ -22,5 +22,24 @@ Bandwidth: 1.2 GB/s RX | 944 MB/s TX
 
 on all the servers IP1 IP2 IP3 ... respectively.
 
+## On k8s
+
+### Using helm
+```
+helm install https://github.com/minio/mperf/raw/main/helm-releases/mperf-v3.0.4.tgz --generate-name --namespace <my-namespace>
+```
+
+### Using `yaml`
+
+```
+export NAMESPACE=<my-namespace>
+kubectl apply -f https://github.com/minio/mperf/raw/main/mperf.yaml --namespace $NAMESPACE
+```
+
+### Observe the output
+```
+kubectl logs --namespace <my-namespace> --max-log-requests <replica-count> -l "app=mperf" -f
+```
+
 ### LICENSE
 Use of `mperf` tool is governed by the GNU AGPLv3 license that can be found in the [LICENSE](./LICENSE) file.

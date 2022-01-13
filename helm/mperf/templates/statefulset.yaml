@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ template "mperf.fullname" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: mperf
+spec:
+  serviceName: {{ template "mperf.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: mperf
+  template:
+    metadata:
+      name: mperf
+      labels:
+        app: mperf
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "mperf.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: mperf
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            {{- range $i := until ($.Values.replicaCount | int)}}
+            - {{ template "mperf.fullname" $ }}-{{ $i }}.{{ template "mperf.fullname" $ }}.{{ $.Release.Namespace }}.svc.{{ $.Values.clusterDomain }}
+            {{ end }}
+          ports:
+            - name: http1
+              containerPort: 9999
+            - name: http2
+              containerPort: 10000
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - mperf
+              topologyKey: "kubernetes.io/hostname"
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
