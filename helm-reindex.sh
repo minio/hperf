@@ -1,3 +1,3 @@
 #!/bin/bash
 
-helm package helm/mperf -d helm-releases/
+helm package helm/nperf -d helm-releases/

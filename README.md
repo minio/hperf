@@ -1,10 +1,10 @@
-# mperf
+# nperf
 
-mperf is a tool for active measurements of the maximum achievable bandwidth between N peers, measuring RX/TX bandwidth for each peers.
+nperf is a tool for active measurements of the maximum achievable bandwidth between N peers, measuring RX/TX bandwidth for each peers.
 
 ## Download
 
-[Download Binary Releases](https://github.com/minio/mperf/releases) for various platforms.
+[Download Binary Releases](https://github.com/minio/nperf/releases) for various platforms.
 
 ## Usecases
 - Calculate baseline RX/TX
@@ -12,7 +12,7 @@ mperf is a tool for active measurements of the maximum achievable bandwidth betw
 
 ## Usage
 ```
-./mperf IP1 IP2 IP3 ...
+./nperf IP1 IP2 IP3 ...
 ...
 Bandwidth: 1.2 GB/s RX | 1.0 GB/s TX
 Bandwidth: 1.2 GB/s RX | 1.1 GB/s TX
@@ -26,20 +26,20 @@ on all the servers IP1 IP2 IP3 ... respectively.
 
 ### Using helm
 ```
-helm install https://github.com/minio/mperf/raw/main/helm-releases/mperf-v3.0.4.tgz --generate-name --namespace <my-namespace>
+helm install https://github.com/minio/nperf/raw/main/helm-releases/nperf-v4.0.0.tgz --generate-name --namespace <my-namespace>
 ```
 
 ### Using `yaml`
 
 ```
 export NAMESPACE=<my-namespace>
-kubectl apply -f https://github.com/minio/mperf/raw/main/mperf.yaml --namespace $NAMESPACE
+kubectl apply -f https://github.com/minio/nperf/raw/main/nperf.yaml --namespace $NAMESPACE
 ```
 
 ### Observe the output
 ```
-kubectl logs --namespace <my-namespace> --max-log-requests <replica-count> -l "app=mperf" -f
+kubectl logs --namespace <my-namespace> --max-log-requests <replica-count> -l "app=nperf" -f
 ```
 
 ### LICENSE
-Use of `mperf` tool is governed by the GNU AGPLv3 license that can be found in the [LICENSE](./LICENSE) file.
+Use of `nperf` tool is governed by the GNU AGPLv3 license that can be found in the [LICENSE](./LICENSE) file.

@@ -1,0 +1,4 @@
+---
+Look for `nperf` results with `kubectl logs`
+
+kubectl logs --namespace {{ .Release.Namespace }} --max-log-requests {{ .Values.replicaCount }} -l "app=nperf" -f

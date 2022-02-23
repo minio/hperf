@@ -1,4 +1,4 @@
-module github.com/minio/mperf
+module github.com/minio/nperf
 
 go 1.16
 
