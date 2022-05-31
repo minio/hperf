@@ -22,6 +22,13 @@ Bandwidth: 1.2 GB/s RX | 944 MB/s TX
 
 on all the servers IP1 IP2 IP3 ... respectively.
 
+Default ports are `9999` and `10000` make sure your firewalls allow these ports. You may optionally configure `./nperf` to use custom ports as well, for example setting port `5001` would require opening up port `5002` as well.
+
+
+```
+NPERF_PORT=5001 ./nperf IP1 IP2 IP3 ...
+```
+
 ## On k8s
 
 ### Using helm

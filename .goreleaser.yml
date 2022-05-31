@@ -43,7 +43,7 @@ nfpms:
     vendor: MinIO, Inc.
     homepage: https://github.com/minio/nperf
     maintainer: MinIO Development <dev@min.io>
-    description: Mesh throughput tool performs N peers to N peers cross network benchmark measuring RX/TX bandwidth for each peers
+    description: Nperf tool performs N peers to N peers cross network benchmark measuring RX/TX bandwidth for each peers
     license: GNU Affero General Public License v3.0
     formats:
       - deb

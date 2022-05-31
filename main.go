@@ -33,7 +33,7 @@ import (
 )
 
 var port = func() string {
-	p := os.Getenv("MESH_PORT")
+	p := os.Getenv("NPERF_PORT")
 	if p == "" {
 		p = "9999"
 	}
