@@ -53,8 +53,10 @@ var uniqueStr = uuid.New().String()
 
 var oneMB = 1024 * 1024
 
-var dataIn uint64
-var dataOut uint64
+var (
+	dataIn  uint64
+	dataOut uint64
+)
 
 func printDataOut() {
 	for {
