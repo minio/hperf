@@ -4,6 +4,6 @@ MAINTAINER MinIO Development "dev@min.io"
 EXPOSE 9999
 EXPOSE 10000
 
-COPY nperf /nperf
+COPY ./nperf /nperf
 
 ENTRYPOINT ["/nperf"]

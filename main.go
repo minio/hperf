@@ -72,6 +72,7 @@ func handleTX(conn net.Conn, b []byte) error {
 	for {
 		n, err := conn.Write(b)
 		if err != nil {
+			log.Println("TX-Error", conn, err)
 			return err
 		}
 		atomic.AddUint64(&dataOut, uint64(n))
@@ -84,6 +85,7 @@ func handleRX(conn net.Conn) {
 	for {
 		n, err := conn.Read(b)
 		if err != nil {
+			log.Println("RX-Error", conn, err)
 			return
 		}
 		atomic.AddUint64(&dataIn, uint64(n))
@@ -152,8 +154,8 @@ func main() {
 		http.HandleFunc("/"+uniqueStr, func(w http.ResponseWriter, req *http.Request) {})
 		s.ListenAndServe()
 	}()
-	log.Println("Starting HTTP service to skip self..")
-	time.Sleep(time.Second * 2)
+	log.Println("Starting HTTP service to skip self.. waiting for 10secs for services to be ready")
+	time.Sleep(time.Second * 10)
 
 	go runServer()
 	go printDataOut()
