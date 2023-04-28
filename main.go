@@ -118,6 +118,7 @@ func runClient(host string) {
 	for i := 0; i < proc; i++ {
 		conn, err := net.Dial("tcp", host)
 		if err != nil {
+			log.Println("Dial-Error", conn, err)
 			time.Sleep(time.Second)
 			continue
 		}
