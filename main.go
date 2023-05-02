@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2021 MinIO, Inc.
+// Copyright (c) 2015-2023 MinIO, Inc.
 //
 // This file is part of MinIO Object Storage stack
 //
@@ -58,6 +58,8 @@ var (
 	dataOut uint64
 )
 
+const dialTimeout = 1 * time.Second
+
 func printDataOut() {
 	for {
 		time.Sleep(time.Second)
@@ -114,16 +116,24 @@ func runClient(host string) {
 	b := make([]byte, oneMB)
 	proc := 16 // 16 TCP connections is more than enough to saturate a 100G link.
 	var wg sync.WaitGroup
-	wg.Add(proc)
 	for i := 0; i < proc; i++ {
-		conn, err := net.Dial("tcp", host)
-		if err != nil {
-			log.Println("Dial-Error", conn, err)
-			time.Sleep(time.Second)
-			continue
-		}
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			var conn net.Conn
+			var err error
+			// Establish the connection.
+			for {
+				conn, err = net.Dial("tcp", host)
+				if err != nil {
+					log.Println("Dial-Error", conn, err)
+					time.Sleep(dialTimeout)
+					continue
+				} else {
+					break
+				}
+			}
+			// Use the connection.
 			if err := handleTX(conn, b); err != nil {
 				panic(err)
 			}
