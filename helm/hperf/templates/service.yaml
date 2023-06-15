@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ template "nperf.fullname" . }}
+  name: {{ template "hperf.fullname" . }}
   labels:
-    app: nperf
+    app: hperf
 spec:
   publishNotReadyAddresses: true
   clusterIP: None  
@@ -13,4 +13,4 @@ spec:
     - port: 10000
       name: http2
   selector:
-    app: nperf
+    app: hperf

@@ -2,9 +2,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: nperf
+  name: hperf
   labels:
-    app: nperf
+    app: hperf
 spec:
   publishNotReadyAddresses: true
   clusterIP: None
@@ -14,26 +14,26 @@ spec:
     - port: 10000
       name: http2
   selector:
-    app: nperf
+    app: hperf
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: nperf
+  name: hperf
   labels:
-    app: nperf
+    app: hperf
 spec:
-  serviceName: nperf
+  serviceName: hperf
   podManagementPolicy: Parallel
   replicas: 6
   selector:
     matchLabels:
-      app: nperf
+      app: hperf
   template:
     metadata:
-      name: nperf
+      name: hperf
       labels:
-        app: nperf
+        app: hperf
     spec:
       affinity:
         podAntiAffinity:
@@ -43,19 +43,19 @@ spec:
                 - key: app
                   operator: In
                   values:
-                  - nperf
+                  - hperf
               topologyKey: "kubernetes.io/hostname"
       containers:
-        - name: nperf
-          image: "quay.io/minio/nperf"
+        - name: hperf
+          image: "quay.io/minio/hperf"
           imagePullPolicy: Always
           args:
-            - nperf-0.nperf.${NAMESPACE}.svc.cluster.local
-            - nperf-1.nperf.${NAMESPACE}.svc.cluster.local
-            - nperf-2.nperf.${NAMESPACE}.svc.cluster.local
-            - nperf-3.nperf.${NAMESPACE}.svc.cluster.local
-            - nperf-4.nperf.${NAMESPACE}.svc.cluster.local
-            - nperf-5.nperf.${NAMESPACE}.svc.cluster.local
+            - hperf-0.hperf.${NAMESPACE}.svc.cluster.local
+            - hperf-1.hperf.${NAMESPACE}.svc.cluster.local
+            - hperf-2.hperf.${NAMESPACE}.svc.cluster.local
+            - hperf-3.hperf.${NAMESPACE}.svc.cluster.local
+            - hperf-4.hperf.${NAMESPACE}.svc.cluster.local
+            - hperf-5.hperf.${NAMESPACE}.svc.cluster.local
           ports:
             - name: http1
               containerPort: 9999
