@@ -44,6 +44,9 @@ var port = func() string {
 }()
 
 var selfDetectPort = func() string {
+	if sp := os.Getenv("HPERF_SELF_PORT"); sp != "" {
+		return sp
+	}
 	sp, err := strconv.Atoi(port)
 	if err != nil {
 		log.Fatal(err)
