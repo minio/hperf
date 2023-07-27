@@ -35,7 +35,10 @@ import (
 var port = func() string {
 	p := os.Getenv("NPERF_PORT")
 	if p == "" {
-		p = "9999"
+		p = os.Getenv("HPERF_PORT")
+		if p == "" {
+			p = "9999"
+		}
 	}
 	return p
 }()
