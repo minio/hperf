@@ -1,4 +1,6 @@
 dist/
 mperf
+./nperf
 hperf
-nperf
+./hperf
+deploy.sh

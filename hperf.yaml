@@ -11,8 +11,6 @@ spec:
   ports:
     - port: 9999
       name: http1
-    - port: 10000
-      name: http2
   selector:
     app: hperf
 ---
@@ -59,5 +57,3 @@ spec:
           ports:
             - name: http1
               containerPort: 9999
-            - name: http2
-              containerPort: 10000

@@ -38,8 +38,6 @@ spec:
           ports:
             - name: http1
               containerPort: 9999
-            - name: http2
-              containerPort: 10000
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
