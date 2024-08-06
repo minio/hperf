@@ -48,6 +48,8 @@ import (
 var (
 	httpServer = fiber.New(fiber.Config{
 		StreamRequestBody: true,
+		ReadBufferSize:    1000000,
+		WriteBufferSize:   1000000,
 	})
 	bindAddress      = "0.0.0.0:9000"
 	testFolderSuffix = "hperf-tests"
