@@ -1,6 +1,1 @@
-dist/
-mperf
-./nperf
-hperf
 ./hperf
-deploy.sh

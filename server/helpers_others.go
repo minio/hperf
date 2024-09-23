@@ -18,33 +18,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package main
+package server
 
-import (
-	"context"
-	"net"
-	"syscall"
-	"time"
-)
+import "syscall"
 
-// TODO: if possible implement for non-linux platforms, not a priority at the moment
-//
 //nolint:unused
 func setTCPParametersFn() func(network, address string, c syscall.RawConn) error {
 	return func(network, address string, c syscall.RawConn) error {
 		return nil
-	}
-}
-
-// DialContext is a function to make custom Dial for internode communications
-type DialContext func(ctx context.Context, network, address string) (net.Conn, error)
-
-// NewInternodeDialContext configures a custom dialer for internode communications
-func NewInternodeDialContext(dialTimeout time.Duration) DialContext {
-	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		dialer := &net.Dialer{
-			Timeout: dialTimeout,
-		}
-		return dialer.DialContext(ctx, network, addr)
 	}
 }

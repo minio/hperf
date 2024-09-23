@@ -18,15 +18,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package main
+package server
 
 import (
-	"context"
-	"net"
 	"syscall"
-	"time"
 
-	"github.com/dustin/go-humanize"
 	"golang.org/x/sys/unix"
 )
 
@@ -37,15 +33,14 @@ func setTCPParametersFn() func(network, address string, c syscall.RawConn) error
 			fd := int(fdPtr)
 
 			_ = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEADDR, 1)
-
 			_ = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
 
 			{
 				// Enable big buffers
-				_ = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_SNDBUF, 8*humanize.MiByte)
-
-				_ = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUF, 8*humanize.MiByte)
+				// _ = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_SNDBUF, 65535)
+				// _ = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_RCVBUF, 65535)
 			}
+			_ = unix.SetsockoptInt(fd, unix.SOL_SOCKET, unix.TCP_NODELAY, 1)
 
 			// Enable TCP open
 			// https://lwn.net/Articles/508865/ - 32k queue size.
@@ -79,19 +74,5 @@ func setTCPParametersFn() func(network, address string, c syscall.RawConn) error
 			}
 		})
 		return nil
-	}
-}
-
-// DialContext is a function to make custom Dial for internode communications
-type DialContext func(ctx context.Context, network, address string) (net.Conn, error)
-
-// NewInternodeDialContext setups a custom dialer for internode communication
-func NewInternodeDialContext(dialTimeout time.Duration) DialContext {
-	d := &net.Dialer{
-		Timeout: dialTimeout,
-		Control: setTCPParametersFn(),
-	}
-	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		return d.DialContext(ctx, network, addr)
 	}
 }
