@@ -1,4 +1,4 @@
-package hperf
+package main
 
 import (
 	"fmt"
