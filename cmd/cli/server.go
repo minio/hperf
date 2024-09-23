@@ -18,10 +18,17 @@
 package main
 
 import (
+	"os"
+
 	"github.com/minio/cli"
 	"github.com/minio/hperf/server"
 	"github.com/minio/hperf/shared"
 )
+
+func getPWD() string {
+	pwd, _ := os.Getwd()
+	return pwd
+}
 
 var (
 	addressFlag = cli.StringFlag{
@@ -34,7 +41,7 @@ var (
 	storagePathFlag = cli.StringFlag{
 		Name:   "storage-path",
 		EnvVar: "HPERF_STORAGE_PATH",
-		Value:  "$pwd",
+		Value:  getPWD(),
 		Usage:  "All test results will be saved in this directory",
 	}
 
