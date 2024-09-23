@@ -27,7 +27,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/minio/pkg/v2/ellipses"
+	"github.com/minio/pkg/v3/ellipses"
 )
 
 var DebugEnabled = false
