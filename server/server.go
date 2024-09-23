@@ -88,7 +88,7 @@ func (t *test) AddError(err error) {
 	t.errors = append(t.errors, shared.TError{Error: err.Error(), Created: time.Now()})
 }
 
-func RunServer(ctx context.Context, bind string, storagePath string) (err error) {
+func RunServer(ctx context.Context, address string, storagePath string) (err error) {
 	cancelContext, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -118,7 +118,7 @@ func RunServer(ctx context.Context, bind string, storagePath string) (err error)
 		return err
 	}
 
-	bindAddress = bind
+	bindAddress = address
 	shared.DEBUG("Bind address:", bindAddress)
 	err = startAPIandWS(cancelContext)
 	if err != nil {

@@ -24,15 +24,15 @@ import (
 )
 
 var (
-	bindFlag = cli.StringFlag{
-		Name:   "bind",
-		EnvVar: "HPERF_BIND",
+	addressFlag = cli.StringFlag{
+		Name:   "address",
+		EnvVar: "HPERF_ADDRESS",
 		Value:  "0.0.0.0:9010",
 		Usage:  "Hperf will bind to the specified address",
 	}
 
 	storagePathFlag = cli.StringFlag{
-		Name:   "storagePath",
+		Name:   "storage-path",
 		EnvVar: "HPERF_STORAGE_PATH",
 		Value:  "$pwd",
 		Usage:  "All test results will be saved in this directory",
@@ -44,7 +44,7 @@ var (
 		Prompt:   "hperf",
 		Usage:    "Run hperf server, you can interact with this server using the client",
 		Action:   runServer,
-		Flags:    []cli.Flag{bindFlag, storagePathFlag, debugFlag},
+		Flags:    []cli.Flag{addressFlag, storagePathFlag, debugFlag},
 		CustomHelpTemplate: `
 	NAME: {{.HelpName}} - {{.Usage}}
 
@@ -59,11 +59,11 @@ var (
 
 		02. Run HPerf server with custom file path
 
-		    {{.Prompt}} {{.HelpName}} --storagePath /path/on/disk
+		    {{.Prompt}} {{.HelpName}} --storage-path /path/on/disk
 
 		03. Run HPerf server with custom file path and custom address
 
-		    {{.Prompt}} {{.HelpName}} --storagePath /path/on/disk --bind 0.0.0.0:9000
+		    {{.Prompt}} {{.HelpName}} --storage-path /path/on/disk --address 0.0.0.0:9000
 
 `,
 	}
@@ -71,5 +71,5 @@ var (
 
 func runServer(ctx *cli.Context) error {
 	shared.DebugEnabled = debug
-	return server.RunServer(GlobalContext, ctx.String("bind"), ctx.String("storagePath"))
+	return server.RunServer(GlobalContext, ctx.String("address"), ctx.String("storage-path"))
 }
