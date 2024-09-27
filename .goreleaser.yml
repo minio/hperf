@@ -32,8 +32,7 @@ builds:
       - --tags=kqueue
     ldflags:
       - "-s -w -X main.version={{.Version}}"
-    dir: .
-    main: ./cmd/cli
+    main: ./cmd/hperf
 
 archives:
   -

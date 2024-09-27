@@ -157,6 +157,10 @@ type Config struct {
 	ResolveHosts string `json:"-"`
 }
 
+func INFO(items ...any) {
+	fmt.Println(items...)
+}
+
 func DEBUG(items ...any) {
 	if DebugEnabled {
 		fmt.Println(items...)

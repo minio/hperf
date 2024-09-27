@@ -22,41 +22,38 @@ import (
 	"github.com/minio/hperf/client"
 )
 
-var getTestsCMD = cli.Command{
-	Name:     "get",
-	HelpName: "get",
-	Prompt:   "hperf",
-	Usage:    "Get and print a test from the selected hosts",
-	Action:   runGetCMD,
+var stopCMD = cli.Command{
+	Name:   "stop",
+	Usage:  "stop a specific test or all test on the selected hosts",
+	Action: runStop,
 	Flags: []cli.Flag{
 		dnsServerFlag,
 		hostsFlag,
 		portFlag,
 		testIDFlag,
 	},
-	CustomHelpTemplate: `
-	NAME: {{.HelpName}}
+	CustomHelpTemplate: `NAME:
+  {{.HelpName}} - {{.Usage}}
 
-	{{.Usage}}
+USAGE:
+  {{.HelpName}} [FLAGS]
 
-	FLAGS:
-		{{range .VisibleFlags}}{{.}}
-		{{end}}
-	EXAMPLES:
+FLAGS:
+  {{range .VisibleFlags}}{{.}}
+  {{end}}
+EXAMPLES:
+  1. Stop all tests on hosts '10.10.10.1' and '10.10.10.2':
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
 
-		01. Get test by ID on hosts .1 and .2
-
-        {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --id my_test_id
-
+  2. Stop test by ID on hosts '10.10.10.1' and '10.10.10.2':
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --id my_test_id
 `,
 }
 
-func runGetCMD(ctx *cli.Context) error {
+func runStop(ctx *cli.Context) error {
 	config, err := parseConfig(ctx)
 	if err != nil {
 		return err
 	}
-
-	client.GetTest(GlobalContext, *config)
-	return nil
+	return client.Stop(GlobalContext, *config)
 }

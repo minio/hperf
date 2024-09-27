@@ -11,19 +11,30 @@ a long period of time.
 ### Download
 [Download Binary Releases](https://github.com/minio/hperf/releases) for various platforms.
 
+You can also install via source
+
+```
+go install github.com/minio/hperf/cmd/hperf@latest
+```
+
 ### Server
 1. Download hperf and place it in a directory of your choosing
    - This can be automated with deployment tools, hperf is just a single binary
+
 2. Run hperf help to see a list of available server commands flags and example
+
 ```bash
 $ ./hperf server --help
 ```
+
 3. Run the server with your preferred settings
 
 ### Client
 1. Download hperf 
+
 2. Run hperf help to see available commands, flags and examples
    - The `--hosts` and `--id` flags are especially important to understand
+
 ```bash
 $ ./hperf --help
 $ ./hperf [command] --help

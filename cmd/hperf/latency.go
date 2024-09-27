@@ -23,12 +23,10 @@ import (
 	"github.com/minio/hperf/shared"
 )
 
-var requestsCMD = cli.Command{
-	Name:     "requests",
-	HelpName: "requests",
-	Prompt:   "hperf",
-	Usage:    "A test to measure http/s throughput at the application level, it will send 1*Request*(--concurrency) containing (--payload) waiting for (--delay) between requests, until the end of (--duration)",
-	Action:   runRequestsCMD,
+var latencyCMD = cli.Command{
+	Name:   "latency",
+	Usage:  "start a test to measure latency at the application level",
+	Action: runLatency,
 	Flags: []cli.Flag{
 		hostsFlag,
 		portFlag,
@@ -43,36 +41,29 @@ var requestsCMD = cli.Command{
 		saveTestFlag,
 		dnsServerFlag,
 	},
-	CustomHelpTemplate: `
-	NAME: {{.HelpName}}
-	
-	{{.Usage}}
+	CustomHelpTemplate: `NAME:
+  {{.HelpName}} - {{.Usage}}
 
-	FLAGS:
-		{{range .VisibleFlags}}{{.}}
-		{{end}}
-	EXAMPLES:
+USAGE:
+  {{.HelpName}} [FLAGS]
 
-		01. Run a basic test
+FLAGS:
+  {{range .VisibleFlags}}{{.}}
+  {{end}}
+EXAMPLES:
+  1. Run a basic test:
+   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
 
-	      {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
-
-		02. Run a test with reduced throughput
-
-	      {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --delay 100
-
-		03. Run a test with reduced concurrency and throughput
-
-	      {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --delay 100 --concurrency 1
-
+  2. Run a slow moving test to probe latency:
+   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --delay 100
 `,
 }
 
-func runRequestsCMD(ctx *cli.Context) error {
+func runLatency(ctx *cli.Context) error {
 	config, err := parseConfig(ctx)
 	if err != nil {
 		return err
 	}
-	config.TestType = shared.HTTPTest
+	config.TestType = shared.LatencyTest
 	return client.RunTest(GlobalContext, *config)
 }

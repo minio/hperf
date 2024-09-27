@@ -22,43 +22,36 @@ import (
 	"github.com/minio/hperf/client"
 )
 
-var deleteCMD = cli.Command{
-	Name:     "delete",
-	HelpName: "delete",
-	Prompt:   "hperf",
-	Usage:    "Deletes one or all tests on the selected hosts",
-	Action:   runDeleteCMD,
+var statTestsCMD = cli.Command{
+	Name:   "stat",
+	Usage:  "print stats for a given test from the selected hosts",
+	Action: runStat,
 	Flags: []cli.Flag{
 		dnsServerFlag,
 		hostsFlag,
 		portFlag,
 		testIDFlag,
 	},
-	CustomHelpTemplate: `
-	NAME: {{.HelpName}}
+	CustomHelpTemplate: `NAME:
+  {{.HelpName}} - {{.Usage}}
 
-	{{.Usage}}
+USAGE:
+  {{.HelpName}} [FLAGS]
 
-	FLAGS:
-		{{range .VisibleFlags}}{{.}}
-		{{end}}
-	EXAMPLES:
-
-		01. Delete all tests on hosts .1 and .2
-
-        {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
-
-		02. Delete test by ID on hosts .1 and .2
-
-	      {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --id my_test_id
-
+FLAGS:
+  {{range .VisibleFlags}}{{.}}
+  {{end}}
+EXAMPLES:
+  1. Print stats by ID for hosts '10.10.10.1' and '10.10.10.2':
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --id my_test_id
 `,
 }
 
-func runDeleteCMD(ctx *cli.Context) error {
+func runStat(ctx *cli.Context) error {
 	config, err := parseConfig(ctx)
 	if err != nil {
 		return err
 	}
-	return client.DeleteTests(GlobalContext, *config)
+
+	return client.GetTest(GlobalContext, *config)
 }

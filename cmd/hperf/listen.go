@@ -22,41 +22,39 @@ import (
 	"github.com/minio/hperf/client"
 )
 
-var stopCMD = cli.Command{
-	Name:     "stop",
-	HelpName: "stop",
-	Prompt:   "hperf",
-	Usage:    "Stop a specific test or all test on the selected hosts",
-	Action:   runStopCMD,
+var listenCMD = cli.Command{
+	Name:   "listen",
+	Usage:  "receive live data from one or all active tests on the selected hosts",
+	Action: runListen,
 	Flags: []cli.Flag{
 		dnsServerFlag,
 		hostsFlag,
 		portFlag,
 		testIDFlag,
 	},
-	CustomHelpTemplate: `
-	NAME: {{.HelpName}} - {{.Usage}}
+	CustomHelpTemplate: `NAME:
+  {{.HelpName}} - {{.Usage}}
 
-	FLAGS:
-		{{range .VisibleFlags}}{{.}}
-		{{end}}
-	EXAMPLES:
+USAGE:
+  {{.HelpName}} [FLAGS]
 
-		01. Stop all tests on hosts .1 and .2
+FLAGS:
+  {{range .VisibleFlags}}{{.}}
+  {{end}}
+EXAMPLES:
+  1. Listen to a specific test on specific hosts:
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --id my_test_id
 
-	      {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
-
-		02. Stop test by ID on hosts .1 and .2
-
-        {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --id my_test_id
-
+  2. Listen to all active tests:
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
 `,
 }
 
-func runStopCMD(ctx *cli.Context) error {
+func runListen(ctx *cli.Context) error {
 	config, err := parseConfig(ctx)
 	if err != nil {
 		return err
 	}
-	return client.Stop(GlobalContext, *config)
+	config.Duration = 0
+	return client.Listen(GlobalContext, *config)
 }

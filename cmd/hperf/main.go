@@ -79,72 +79,72 @@ var (
 	hostsFlag = cli.StringFlag{
 		Name:   "hosts",
 		EnvVar: "HPERF_HOSTS",
-		Usage:  "Hosts that will used for the current command",
+		Usage:  "list of hosts for the current command",
 	}
 	portFlag = cli.StringFlag{
 		Name:   "port",
 		Value:  "9010",
 		EnvVar: "HPERF_PORT",
-		Usage:  "Port used to communicate with hosts",
+		Usage:  "port used to communicate with hosts",
 	}
 	insecureFlag = cli.BoolTFlag{
 		Name:   "insecure",
 		EnvVar: "HPERF_INSECURE",
-		Usage:  "Use http instead of https",
+		Usage:  "use http instead of https",
 	}
 	debugFlag = cli.BoolFlag{
 		Name:   "debug",
 		EnvVar: "HPERF_DEBUG",
-		Usage:  "Enable debug output in the client and on the servers for the particular command",
+		Usage:  "enable debug output logs for client and server for a command",
 	}
 	concurrencyFlag = cli.IntFlag{
 		Name:   "concurrency",
 		EnvVar: "HPERF_CONCURRENCY",
-		Value:  runtime.NumCPU() * 2,
-		Usage:  "This flags controls how many concurrent requests we run between each host, the default is (number of cpus)x2",
+		Value:  runtime.GOMAXPROCS(0) * 2,
+		Usage:  "this flags controls how many concurrent requests to run per host",
 	}
 	delayFlag = cli.IntFlag{
-		Name:   "requestDelay",
+		Name:   "request-delay",
 		Value:  0,
 		EnvVar: "HPERF_REQUEST_DELAY",
-		Usage:  "Creates a delay (in Milliseconds) before sending http requests from host to host",
+		Usage:  "adds a delay (in milliseconds) before sending http requests from host to host",
 	}
 	durationFlag = cli.IntFlag{
 		Name:   "duration",
 		Value:  30,
 		EnvVar: "HPERF_DURATION",
-		Usage:  "Controls how long the test will be ran",
+		Usage:  "controls how long a test will run",
 	}
 	bufferSizeFlag = cli.IntFlag{
-		Name:   "bufferSize",
+		Name:   "buffer-size",
 		Value:  32000,
 		EnvVar: "HPERF_BUFFER_SIZE",
-		Usage:  "Buffer size in Bytes",
+		Usage:  "buffer size in bytes",
 	}
 	payloadSizeFlag = cli.IntFlag{
-		Name:   "payloadSize",
+		Name:   "payload-size",
 		Value:  1000000,
 		EnvVar: "HPERF_PAYLOAD_SIZE",
-		Usage:  "Payload size in Bytes",
+		Usage:  "payload size in bytes",
 	}
 	restartOnErrorFlag = cli.BoolTFlag{
-		Name:   "restartOnError",
+		Name:   "restart-on-error",
 		EnvVar: "HPERF_RESTART_ON_ERROR",
-		Usage:  "restart tests/clients if an error occures",
+		Usage:  "restart tests/clients upon error",
 	}
 	testIDFlag = cli.StringFlag{
 		Name:  "id",
-		Usage: "The id is a tag you can use to label tests which run on the servers",
+		Usage: "specify custom ID per test",
 	}
 	saveTestFlag = cli.BoolTFlag{
 		Name:   "save",
 		EnvVar: "HPERF_SAVE",
-		Usage:  "Save tests results on the server for querying later",
+		Usage:  "save tests results on the server for retrieve later",
 	}
 	dnsServerFlag = cli.StringFlag{
-		Name:   "dnsServer",
+		Name:   "dns-server",
 		EnvVar: "HPERF_DNS_SERVER",
-		Usage:  "Hperf will use this DNS server to resolve hosts which are not in an IP format",
+		Usage:  "use a custom DNS server to resolve hosts",
 	}
 )
 
@@ -154,14 +154,12 @@ var (
 	}
 	Commands = []cli.Command{
 		serverCMD,
-
 		bandwidthCMD,
 		requestsCMD,
 		latencyCMD,
 		listenCMD,
-
 		listTestsCMD,
-		getTestsCMD,
+		statTestsCMD,
 		stopCMD,
 		deleteCMD,
 	}
@@ -186,10 +184,11 @@ func CreateApp() *cli.App {
 	}
 
 	app.Name = "hperf"
-	app.HideHelpCommand = false
+	app.HideHelpCommand = true
 	app.Usage = "MinIO network performance test utility for infrastructure at scale"
 	app.Commands = Commands
 	app.Author = "MinIO, Inc."
+	app.Copyright = "(c) 2021-2024 MinIO, Inc."
 	app.Version = VERSION
 	app.Flags = baseFlags
 	app.CustomAppHelpTemplate = mcHelpTemplate

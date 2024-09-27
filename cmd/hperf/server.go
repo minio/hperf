@@ -35,43 +35,39 @@ var (
 		Name:   "address",
 		EnvVar: "HPERF_ADDRESS",
 		Value:  "0.0.0.0:9010",
-		Usage:  "Hperf will bind to the specified address",
+		Usage:  "bind to the specified address",
 	}
 
 	storagePathFlag = cli.StringFlag{
 		Name:   "storage-path",
 		EnvVar: "HPERF_STORAGE_PATH",
 		Value:  getPWD(),
-		Usage:  "All test results will be saved in this directory",
+		Usage:  "all test results will be saved in this directory",
 	}
 
 	serverCMD = cli.Command{
-		Name:     "server",
-		HelpName: "server",
-		Prompt:   "hperf",
-		Usage:    "Run hperf server, you can interact with this server using the client",
-		Action:   runServer,
-		Flags:    []cli.Flag{addressFlag, storagePathFlag, debugFlag},
-		CustomHelpTemplate: `
-	NAME: {{.HelpName}} - {{.Usage}}
+		Name:   "server",
+		Usage:  "start an interactive server",
+		Action: runServer,
+		Flags:  []cli.Flag{addressFlag, storagePathFlag, debugFlag},
+		CustomHelpTemplate: `NAME:
+  {{.HelpName}} - {{.Usage}}
 
-	FLAGS:
-		{{range .VisibleFlags}}{{.}}		
-		{{end}}
-	EXAMPLES:
-	
-		01. Run HPerf server with defaults
-		  
-		    {{.Prompt}} {{.HelpName}}
+USAGE:
+  {{.HelpName}} [FLAGS]
 
-		02. Run HPerf server with custom file path
+FLAGS:
+  {{range .VisibleFlags}}{{.}}
+  {{end}}
+EXAMPLES:
+  1. Run HPerf server with defaults:
+    {{.Prompt}} {{.HelpName}}
 
-		    {{.Prompt}} {{.HelpName}} --storage-path /path/on/disk
+  2. Run HPerf server with custom file path
+    {{.Prompt}} {{.HelpName}} --storage-path /path/on/disk
 
-		03. Run HPerf server with custom file path and custom address
-
-		    {{.Prompt}} {{.HelpName}} --storage-path /path/on/disk --address 0.0.0.0:9000
-
+  3. Run HPerf server with custom file path and custom address
+    {{.Prompt}} {{.HelpName}} --storage-path /path/on/disk --address 0.0.0.0:9000
 `,
 	}
 )

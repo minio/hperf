@@ -45,9 +45,12 @@ import (
 
 var (
 	httpServer = fiber.New(fiber.Config{
-		StreamRequestBody: true,
-		ReadBufferSize:    1000000,
-		WriteBufferSize:   1000000,
+		StreamRequestBody:     true,
+		ServerHeader:          "hperf",
+		AppName:               "hperf",
+		DisableStartupMessage: true,
+		ReadBufferSize:        1000000,
+		WriteBufferSize:       1000000,
 	})
 	bindAddress      = "0.0.0.0:9000"
 	testFolderSuffix = "hperf-tests"
@@ -117,7 +120,7 @@ func RunServer(ctx context.Context, address string, storagePath string) (err err
 	}
 
 	bindAddress = address
-	shared.DEBUG("Bind address:", bindAddress)
+	shared.INFO("starting 'hperf' server on:", bindAddress)
 	err = startAPIandWS(cancelContext)
 	if err != nil {
 		return

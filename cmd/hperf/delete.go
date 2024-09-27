@@ -22,39 +22,38 @@ import (
 	"github.com/minio/hperf/client"
 )
 
-var listTestsCMD = cli.Command{
-	Name:     "list",
-	HelpName: "list",
-	Prompt:   "hperf",
-	Usage:    "List all tests on the selected hosts",
-	Action:   runListCMD,
+var deleteCMD = cli.Command{
+	Name:   "delete",
+	Usage:  "deletes one or all tests on the selected hosts",
+	Action: runDelete,
 	Flags: []cli.Flag{
 		dnsServerFlag,
 		hostsFlag,
 		portFlag,
 		testIDFlag,
 	},
-	CustomHelpTemplate: `
-	NAME: {{.HelpName}}
+	CustomHelpTemplate: `NAME:
+  {{.HelpName}} - {{.Usage}}
 
-	{{.Usage}}
+USAGE:
+  {{.HelpName}} [FLAGS]
 
-	FLAGS:
-		{{range .VisibleFlags}}{{.}}
-		{{end}}
-	EXAMPLES:
+FLAGS:
+  {{range .VisibleFlags}}{{.}}
+  {{end}}
+EXAMPLES:
+  1. Delete all tests on hosts '10.10.10.1' and '10.10.10.2':
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
 
-		01. List all test on the server
-
-	      {{.Prompt}} {{.HelpName}} --hosts 1.1.1.1
-
+  2. Delete test by ID on hosts '10.10.10.1' and '10.10.10.2':
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --id my_test_id
 `,
 }
 
-func runListCMD(ctx *cli.Context) error {
+func runDelete(ctx *cli.Context) error {
 	config, err := parseConfig(ctx)
 	if err != nil {
 		return err
 	}
-	return client.ListTests(GlobalContext, *config)
+	return client.DeleteTests(GlobalContext, *config)
 }

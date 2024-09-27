@@ -23,58 +23,50 @@ import (
 	"github.com/minio/hperf/shared"
 )
 
-var bandwidthCMD = cli.Command{
-	Name:     "bandwidth",
-	HelpName: "bandwidth",
-	Prompt:   "hperf",
-	Usage:    "A test which focuses on measuring bandwidth, It will open up a single socket(x --concurrency) and write as much data as possible for the configured --duration",
-	Action:   runBandwidthCMD,
+var requestsCMD = cli.Command{
+	Name:   "requests",
+	Usage:  "start a test to measure http(s) throughput at the application level",
+	Action: runRequests,
 	Flags: []cli.Flag{
-		dnsServerFlag,
 		hostsFlag,
 		portFlag,
-		testIDFlag,
 		insecureFlag,
 		concurrencyFlag,
+		delayFlag,
 		durationFlag,
 		bufferSizeFlag,
 		payloadSizeFlag,
 		restartOnErrorFlag,
+		testIDFlag,
 		saveTestFlag,
+		dnsServerFlag,
 	},
-	CustomHelpTemplate: `
-	NAME: {{.HelpName}} 
+	CustomHelpTemplate: `NAME:
+  {{.HelpName}} - {{.Usage}}
 
-	{{.Usage}}
+USAGE:
+  {{.HelpName}} [FLAGS]
 
-	FLAGS:
-		{{range .VisibleFlags}}{{.}}
-		{{end}}
-	EXAMPLES:
+FLAGS:
+  {{range .VisibleFlags}}{{.}}
+  {{end}}
+EXAMPLES:
+  1. Run a basic test:
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
 
-		01. Run a basic test
+  2. Run a test with reduced throughput:
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --delay 100
 
-        {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
-
-		02. Run a test with custom concurrency 
-	      - Matching concurrency with your thread count can often lead to improved performance 
-				- Sometimes it's even better to run concurrency at thread_count/2
-
-        {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --concurrency 24
-
-		03. Run a test with custom buffer sizes 
-	      - This can be handy when testing MTU and other parameters for optimizations
-
-        {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --bufferSize 8192 --payloadSize 8192
-
+  3. Run a test with reduced concurrency and throughput:
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --delay 100 --concurrency 1
 `,
 }
 
-func runBandwidthCMD(ctx *cli.Context) error {
+func runRequests(ctx *cli.Context) error {
 	config, err := parseConfig(ctx)
 	if err != nil {
 		return err
 	}
-	config.TestType = shared.BandwidthTest
+	config.TestType = shared.HTTPTest
 	return client.RunTest(GlobalContext, *config)
 }

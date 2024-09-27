@@ -20,55 +20,37 @@ package main
 import (
 	"github.com/minio/cli"
 	"github.com/minio/hperf/client"
-	"github.com/minio/hperf/shared"
 )
 
-var latencyCMD = cli.Command{
-	Name:     "latency",
-	HelpName: "latency",
-	Prompt:   "hperf",
-	Usage:    "A test to measure latency at the application level, it will send 1*Request*(--concurrency) waiting for (--delay) between requests, until the end of (--duration)",
-	Action:   runLatencyCMD,
+var listTestsCMD = cli.Command{
+	Name:   "list",
+	Usage:  "list all tests on the selected hosts",
+	Action: runList,
 	Flags: []cli.Flag{
+		dnsServerFlag,
 		hostsFlag,
 		portFlag,
-		insecureFlag,
-		concurrencyFlag,
-		delayFlag,
-		durationFlag,
-		bufferSizeFlag,
-		payloadSizeFlag,
-		restartOnErrorFlag,
 		testIDFlag,
-		saveTestFlag,
-		dnsServerFlag,
 	},
-	CustomHelpTemplate: `
-	NAME: {{.HelpName}}
-	
-	{{.Usage}}
+	CustomHelpTemplate: `NAME:
+  {{.HelpName}} - {{.Usage}}
 
-	FLAGS:
-		{{range .VisibleFlags}}{{.}}
-		{{end}}
-	EXAMPLES:
+USAGE:
+  {{.HelpName}} [FLAGS]
 
-		01. Run a basic test
-
-	      {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
-
-		02. Run a slow moving test to probe latency
-
-	      {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --delay 100
-
+FLAGS:
+  {{range .VisibleFlags}}{{.}}
+  {{end}}
+EXAMPLES:
+  1. List all test on the '10.10.10.1':
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1
 `,
 }
 
-func runLatencyCMD(ctx *cli.Context) error {
+func runList(ctx *cli.Context) error {
 	config, err := parseConfig(ctx)
 	if err != nil {
 		return err
 	}
-	config.TestType = shared.LatencyTest
-	return client.RunTest(GlobalContext, *config)
+	return client.ListTests(GlobalContext, *config)
 }
