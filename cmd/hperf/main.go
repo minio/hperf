@@ -33,9 +33,7 @@ import (
 	"github.com/minio/hperf/shared"
 )
 
-const (
-	VERSION = "4.0.8"
-)
+var version = "0.0.0-dev"
 
 // Help template for mc
 var mcHelpTemplate = `NAME:
@@ -189,7 +187,7 @@ func CreateApp() *cli.App {
 	app.Commands = Commands
 	app.Author = "MinIO, Inc."
 	app.Copyright = "(c) 2021-2024 MinIO, Inc."
-	app.Version = VERSION
+	app.Version = version
 	app.Flags = baseFlags
 	app.CustomAppHelpTemplate = mcHelpTemplate
 	app.EnableBashCompletion = false
