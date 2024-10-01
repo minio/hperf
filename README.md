@@ -18,8 +18,8 @@ a long period of time.
 The binary can act as both client and server.
 
 ### Client
-The client part of hperf is responsible for orchestrating the servers. It's only job is to send commands to the
-servers and receive incremental stats update. It can be executed from any machine that can talk to the servers.
+The client part of hperf is responsible for orchestrating the servers. Its only job is to send commands to the
+servers and receive incremental stats updates. It can be executed from any machine that can talk to the servers.
 
 ### Servers
 Servers are the machines we are testing. To launch the hperf command in servers mode, simply use the `server` command:
@@ -29,6 +29,18 @@ $ ./hperf server --help
 ```
 This command will start an API and websocket on the given `--address` and save test results to `--storage-path`. 
 
+### The listen command
+Hperf has been modified to work very differently than how it was before. The new version can run tests without a
+specific `client` needing to be constantly connected. Once the `client` has started a test, the `client` can 
+easily exit without interrupting the test stopping.
+
+Any `client` can hook into the list test at runtime using the `--id` of the test. There can even be multiple `clients`
+listening to the same test.
+
+Example:
+```bash
+$ ./hperf listen --hosts 10.10.1.{2...10} --id [TEST_ID]
+```
 
 ## Getting started
 
@@ -64,7 +76,7 @@ $ ./hperf [command] --help
 
 ```
 --hosts: Hosts is where we determine which machines we will send the current command to. The hosts parameter supports
-the same ellipsis pattern as minio and also a comma seperate list of hosts as well as a file: input. The file expects a
+the same ellipsis pattern as minio and also a comma separate list of hosts as well as a file: input. The file expects a
 host per file line.
 
 Examples:
@@ -74,7 +86,7 @@ Examples:
 
 Additionally, if the `server` command was executed with a custom address + port, the port can be specified using `--port`.
 
---id: is the ID used when starting tests, listening to tests, or fetching test results. Be carefull not to re-use the
+--id: is the ID used when starting tests, listening to tests, or fetching test results. Be careful not to re-use the
 ID's if you care about fetching results at a later date.
 ```
 
