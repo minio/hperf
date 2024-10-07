@@ -6,46 +6,94 @@ hperf is a tool for active measurements of the maximum achievable bandwidth betw
 Hperf was made to test networks in large infrastructure. It's highly scalable and cabaple of running parallel tests over
 a long period of time. 
 
-## Getting started
-
-### Download
-[Download Binary Releases](https://github.com/minio/hperf/releases) for various platforms.
-
-You can also install via source
-
-```
-go install github.com/minio/hperf/cmd/hperf@latest
-```
-
-### Server
-1. Download hperf and place it in a directory of your choosing
-   - This can be automated with deployment tools, hperf is just a single binary
-
-2. Run hperf help to see a list of available server commands flags and example
-
-```bash
-$ ./hperf server --help
-```
-
-3. Run the server with your preferred settings
-
-### Client
-1. Download hperf 
-
-2. Run hperf help to see available commands, flags and examples
-   - The `--hosts` and `--id` flags are especially important to understand
-
-```bash
-$ ./hperf --help
-$ ./hperf [command] --help
-```
-
 ## Common use cases
 - Debugging link/nic MTU issues
 - Optimizing throughput speed for specific payload/buffer sizes
 - Finding servers that present latency on the application level when ping is showing no latency
 - Testing overall network throughput
-- Testing server to server reachability 
+- Testing server to server connectivity 
+
+
+## Core concepts
+### The hperf binary
+The binary can act as both client and server.
+
+### Client
+The client part of hperf is responsible for orchestrating the servers. Its only job is to send commands to the
+servers and receive incremental stats updates. It can be executed from any machine that can talk to the servers.
+
+### Servers
+Servers are the machines we are testing. To launch the hperf command in servers mode, simply use the `server` command:
+NOTE: `server` is the only command you can execute on the servers. All other commands are executed from the client.
+```bash
+$ ./hperf server --help
+```
+This command will start an API and websocket on the given `--address` and save test results to `--storage-path`. 
+
+WARNING: do not expose `--address` to the internet
+
+### The listen command
+Hperf can run tests without a specific `client` needing to be constantly connected. Once the `client` has started a test, the `client` can 
+easily exit without interrupting the test stopping.
+
+Any `client` can hook into the list test at runtime using the `--id` of the test. There can even be multiple `clients`
+listening to the same test.
+
+Example:
+```bash
+$ ./hperf listen --hosts 10.10.1.{2...10} --id [TEST_ID]
+```
+
+## Getting started
+
+### Download
+[Download Binary Releases](https://github.com/minio/hperf/releases) for various platforms and place in a directory of
+your choosing.
+
+You can also install via source:
+```
+go install github.com/minio/hperf/cmd/hperf@latest
+```
+
+### Server
+Run server with default settings:
+NOTE: this will place all test result files in the same directory.
+```bash
+$ ./hperf server
+```
+Run the server with custom `--address` and `--storage-path`
+```bash
+$ ./hperf server --address 10.10.2.10:5000 --storage-path /tmp/hperf/
+```
+
+### Client 
+If the `server` command was executed with a custom `--address`, the port can be specified in the `client` using `--port`.
+
+The `--hosts` and `--id` flags are especially important to understand.
+
+`--hosts` is where we determine which machines we will send the current command to. The hosts parameter supports
+the same ellipsis pattern as minio and also a comma separate list of hosts as well as a file: input. The file expects a
+host per file line.
+
+```bash
+./hperf [command] --hosts 1.1.1.1,2.2.2.2
+./hperf [command] --hosts 1.1.1.{1...100}
+./hperf [command] --hosts file:/home/user/hosts
+```
+
+`--id` is used to start, stop, listen to tests, or get results. 
+NOTE: Be careful not to re-use the ID's if you care about fetching results at a later date.
+
+```bash
+# get test results
+./hperf get --hosts 1.1.1.{1...100} --id [my_test_id]
+
+# listen in on a running test
+./hperf listen --hosts 1.1.1.{1...100} --id [my_test_id]
+
+# stop a running test
+./hperf stop --hosts 1.1.1.{1...100} --id [my_test_id]
+```
 
 ## Available Statistics
  - Payload Roundtrip (PMS high/low): 
@@ -65,17 +113,24 @@ $ ./hperf [command] --help
  - CPU (CPUUsed): 
    - Total memory in use (total for all time)
 
-## Example test output which uses all stat types
+## Example: 20 second HTTP payload transfer test using multiple sockets
+This test will use 12 concurrent workers to send http requests with a payload without any timeout between requests.
+Much like a bandwidth test, but it will also test server behaviour when multiple sockets are being created and closed:
 ```
-$ ./hperf requests --hosts 10.10.10.1,10.10.10.2 --id http-test-1 --duration 5 --concurrency 12
+$ ./hperf requests --hosts file:./hosts --id http-test-1 --duration 20 --concurrency 12
+```
 
-Created  Local           Remote          PMSH PMSL TTFBH TTFBL TX        #TX    #ERR   #Dropped  MemUsed CPUUsed
-14:42:09 10.10.10.1      10.10.10.2      19   0    6     0     2.70 GB/s 5129   0      0         40      73
-14:42:09 10.10.10.2      10.10.10.1      18   0    7     0     2.70 GB/s 5111   0      0         40      63
-14:42:10 10.10.10.2      10.10.10.1      16   0    8     0     2.69 GB/s 7799   0      0         40      63
-14:42:10 10.10.10.1      10.10.10.2      17   0    6     0     2.73 GB/s 7862   0      0         40      73
-14:42:11 10.10.10.1      10.10.10.2      19   0    9     0     2.68 GB/s 10553  0      0         40      89
-14:42:11 10.10.10.2      10.10.10.1      20   0    6     0     2.67 GB/s 10472  0      0         40      88
-14:42:12 10.10.10.1      10.10.10.2      17   0    5     0     2.69 GB/s 13238  0      0         40      89
-14:42:12 10.10.10.2      10.10.10.1      17   0    7     0     2.69 GB/s 13175  0      0         40      88
+## Example: 20 second HTTP payload transfer test using a stream
+This will perform a 20 second bandwidth test with 12 concurrent HTTP streams:
 ```
+$ ./hperf bandwidth --hosts file:./hosts --id http-test-2 --duration 20 --concurrency 12
+```
+
+## Example: 5 Minute latency test using a 2000 Byte buffer, with a delay of 50ms between requests
+This test will send a single round trip request between servers to test base latency and reachability:
+```
+$ ./hperf latency --hosts file:./hosts --id http-test-2 --duration 360 --concurrency 1 --requestDelay 50
+--bufferSize 2000 --payloadSize 2000
+```
+
+
