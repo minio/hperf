@@ -134,6 +134,10 @@ var (
 		Name:  "id",
 		Usage: "specify custom ID per test",
 	}
+	outputFlag = cli.StringFlag{
+		Name:  "output",
+		Usage: "set output file path/name",
+	}
 	saveTestFlag = cli.BoolTFlag{
 		Name:   "save",
 		EnvVar: "HPERF_SAVE",
@@ -234,6 +238,7 @@ func parseConfig(ctx *cli.Context) (*shared.Config, error) {
 		TestID:         ctx.String(testIDFlag.Name),
 		RestartOnError: ctx.BoolT(restartOnErrorFlag.Name),
 		Hosts:          hosts,
+		Output:         ctx.String(outputFlag.Name),
 	}
 
 	if ctx.String("id") == "" {
