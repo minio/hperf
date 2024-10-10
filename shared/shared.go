@@ -151,6 +151,7 @@ type Config struct {
 	Save           bool          `json:"Save"`
 	Insecure       bool          `json:"Insecure"`
 	TestType       TestType      `json:"TestType"`
+	Output         string        `json:"Output"`
 	// AllowLocalInterface bool          `json:"AllowLocalInterfaces"`
 
 	// Client Only

@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"runtime/debug"
 	"slices"
 	"strconv"
@@ -206,7 +207,7 @@ func handleWSConnection(ctx context.Context, c *shared.Config, host string, id i
 		case shared.ListTests:
 			go parseTestList(signal.TestList)
 		case shared.GetTest:
-			go receiveJSONDataPoint(signal.Data)
+			go receiveJSONDataPoint(signal.Data, c)
 		case shared.Err:
 			go PrintErrorString(signal.Error)
 		case shared.Done:
@@ -231,7 +232,7 @@ func PrintError(err error) {
 	fmt.Println(ErrorStyle.Render("ERROR: ", err.Error()))
 }
 
-func receiveJSONDataPoint(data []byte) {
+func receiveJSONDataPoint(data []byte, c *shared.Config) {
 	responseLock.Lock()
 	defer responseLock.Unlock()
 
@@ -429,6 +430,26 @@ func GetTest(ctx context.Context, c shared.Config) (err error) {
 			return 1
 		}
 	})
+
+	if c.Output != "" {
+		f, err := os.Create(c.Output)
+		if err != nil {
+			return err
+		}
+		for i := range responseDPS {
+			outb, err := json.Marshal(responseDPS[i])
+			if err != nil {
+				PrintError(err)
+				continue
+			}
+			_, err = f.Write(append(outb, []byte{10}...))
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
 
 	printDataPointHeaders(responseDPS[0].Type)
 	for i := range responseDPS {

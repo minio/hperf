@@ -31,6 +31,7 @@ var statTestsCMD = cli.Command{
 		hostsFlag,
 		portFlag,
 		testIDFlag,
+		outputFlag,
 	},
 	CustomHelpTemplate: `NAME:
   {{.HelpName}} - {{.Usage}}
@@ -44,6 +45,8 @@ FLAGS:
 EXAMPLES:
   1. Print stats by ID for hosts '10.10.10.1' and '10.10.10.2':
     {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --id my_test_id
+  2. Save stats by ID for hosts '10.10.10.1' and '10.10.10.2':
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --id my_test_id --output /tmp/output-file
 `,
 }
 
