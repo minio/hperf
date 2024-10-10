@@ -86,7 +86,9 @@ NOTE: Be careful not to re-use the ID's if you care about fetching results at a 
 
 ```bash
 # get test results
-./hperf get --hosts 1.1.1.{1...100} --id [my_test_id]
+./hperf stat --hosts 1.1.1.{1...100} --id [my_test_id]
+# save test results
+./hperf stat --hosts 1.1.1.{1...100} --id [my_test_id] --output /tmp/file
 
 # listen in on a running test
 ./hperf listen --hosts 1.1.1.{1...100} --id [my_test_id]
