@@ -30,6 +30,7 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,6 +39,7 @@ import (
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 	"github.com/minio/hperf/shared"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
@@ -69,24 +71,31 @@ type test struct {
 
 	Readers  []*netPerfReader
 	errors   []shared.TError
+	errMap   map[string]struct{}
 	errIndex atomic.Int32
 	DPS      []shared.DP
 	M        sync.Mutex
 
 	DataFile      *os.File
 	DataFileIndex int
+	cons          map[string]*websocket.Conn
 }
 
-func (t *test) AddError(err error) {
+func (t *test) AddError(err error, id string) {
+	t.M.Lock()
+	defer t.M.Unlock()
 	if err == nil {
+		return
+	}
+	_, ok := t.errMap[id]
+	if ok {
 		return
 	}
 	if t.Config.Debug {
 		fmt.Println("ERR:", err)
 	}
-	t.M.Lock()
-	defer t.M.Unlock()
 	t.errors = append(t.errors, shared.TError{Error: err.Error(), Created: time.Now()})
+	t.errMap[id] = struct{}{}
 }
 
 func RunServer(ctx context.Context, address string, storagePath string) (err error) {
@@ -359,6 +368,8 @@ func newTest(c *shared.Config) (t *test, err error) {
 	defer testLock.Unlock()
 
 	t = new(test)
+	t.errMap = make(map[string]struct{})
+	t.cons = make(map[string]*websocket.Conn)
 	t.Started = time.Now()
 	t.Config = *c
 	t.DPS = make([]shared.DP, 0)
@@ -477,7 +488,7 @@ func createAndRunTest(con *websocket.Conn, signal shared.WebsocketSignal) {
 		go startPerformanceReader(test, test.Readers[i])
 	}
 
-	var paginator DataPointPaginator
+	listenToLiveTests(con, signal)
 	for {
 		if test.ctx.Err() != nil {
 			return
@@ -490,34 +501,24 @@ func createAndRunTest(con *websocket.Conn, signal shared.WebsocketSignal) {
 		if signal.Config.Debug {
 			fmt.Println("Duration: ", signal.Config.TestID, time.Since(start).Seconds())
 		}
+
 		generateDataPoints(test)
-		if con != nil {
-			_, paginator = sendDataResponseToWebsocket(con, test, paginator)
-		}
+		_ = sendAndSaveData(test)
 	}
 }
 
 func listenToLiveTests(con *websocket.Conn, s shared.WebsocketSignal) {
-	var paginator DataPointPaginator
-	var err error
-	paginator.After = time.Now()
-	for {
-		time.Sleep(1 * time.Second)
-		for i := range tests {
-			if time.Since(tests[i].Started).Seconds() > float64(tests[i].Config.Duration) {
-				continue
-			}
-			if s.Config.TestID != "" && tests[i].ID != s.Config.TestID {
-				continue
-			}
-			if s.Config.Debug {
-				fmt.Println("Listen:", tests[i].ID, "DPS:", len(tests[i].DPS), "ERR:", len(tests[i].errors))
-			}
-			err, paginator = sendDataResponseToWebsocket(con, tests[i], paginator)
-			if err != nil {
-				return
-			}
+	uid := uuid.NewString()
+
+	for i := range tests {
+		if s.Config.TestID != "" && tests[i].ID != s.Config.TestID {
+			continue
 		}
+		if s.Config.Debug {
+			fmt.Println("Listen:", tests[i].ID, "DPS:", len(tests[i].DPS), "ERR:", len(tests[i].errors))
+		}
+
+		tests[i].cons[uid] = con
 	}
 }
 
@@ -527,45 +528,68 @@ type DataPointPaginator struct {
 	After    time.Time
 }
 
-func sendDataResponseToWebsocket(con *websocket.Conn, t *test, lastPaginator DataPointPaginator) (err error, Paginator DataPointPaginator) {
+func sendAndSaveData(t *test) (err error) {
+	defer func() {
+		r := recover()
+		if r != nil {
+			log.Println(r, string(debug.Stack()))
+		}
+	}()
+
 	wss := new(shared.WebsocketSignal)
 	wss.SType = shared.Stats
 	dataResponse := new(shared.DataReponseToClient)
 
+	if t.DataFile == nil && t.Config.Save {
+		newTestFile(t)
+	}
+
 	for i := range t.DPS {
-		if i <= lastPaginator.DPIndex {
-			continue
-		}
-		if !lastPaginator.After.IsZero() {
-			if t.DPS[i].Created.Before(lastPaginator.After) {
-				continue
-			}
-		}
 		dataResponse.DPS = append(dataResponse.DPS, t.DPS[i])
-		Paginator.DPIndex = i
+		if t.Config.Save {
+			fileb, err := json.Marshal(t.DPS[i])
+			if err != nil {
+				t.AddError(err, "datapoint-marshaling")
+			}
+			t.DataFile.Write(append(fileb, []byte{10}...))
+		}
+		t.DPS = slices.Delete(t.DPS, i, i+1)
 	}
 
 	for i := range t.errors {
-		if i <= lastPaginator.ErrIndex {
-			continue
-		}
-		if !lastPaginator.After.IsZero() {
-			if t.errors[i].Created.Before(lastPaginator.After) {
-				continue
-			}
-		}
 		dataResponse.Errors = append(dataResponse.Errors, t.errors[i])
-		Paginator.ErrIndex = i
+		if t.Config.Save {
+			fileb, err := json.Marshal(t.errors[i])
+			if err != nil {
+				t.AddError(err, "error-marshaling")
+			}
+			t.DataFile.Write(append(fileb, []byte{10}...))
+		}
+		t.M.Lock()
+		t.errors = slices.Delete(t.errors, i, i+1)
+		t.M.Unlock()
 	}
 
+	t.M.Lock()
+	t.errMap = make(map[string]struct{})
+	t.M.Unlock()
+
 	wss.DataPoint = dataResponse
-	err = con.WriteJSON(wss)
-	if err != nil {
-		if t.Config.Debug {
-			fmt.Println("Unable to send data point:", err)
+	for i := range t.cons {
+		if t.cons[i] == nil {
+			continue
 		}
-		con.Close()
-		con = nil
+
+		fmt.Println("sending!!!")
+		err = t.cons[i].WriteJSON(wss)
+		if err != nil {
+			if t.Config.Debug {
+				fmt.Println("Unable to send data point:", err)
+			}
+			t.cons[i].Close()
+			delete(t.cons, i)
+			continue
+		}
 	}
 	return
 }
@@ -609,18 +633,6 @@ func generateDataPoints(t *test) {
 		r.m.Unlock()
 
 		t.DPS = append(t.DPS, d)
-
-		if t.Config.Save {
-			fileb, err := json.Marshal(d)
-			if err != nil {
-				t.AddError(err)
-			}
-			if t.DataFile == nil {
-				newTestFile(t)
-			}
-			t.DataFile.Write(append(fileb, []byte{10}...))
-		}
-
 	}
 	return
 }
@@ -727,7 +739,7 @@ func sendRequestToHost(t *test, r *netPerfReader, cid int) {
 		route = "/http"
 		body = AR
 	default:
-		t.AddError(fmt.Errorf("Unknown test type: %d", t.Config.TestType))
+		t.AddError(fmt.Errorf("Unknown test type: %d", t.Config.TestType), "unknown-signal")
 	}
 
 	req, err = http.NewRequestWithContext(
@@ -748,12 +760,12 @@ func sendRequestToHost(t *test, r *netPerfReader, cid int) {
 		if errors.Is(err, context.Canceled) {
 			return
 		}
-		t.AddError(err)
+		t.AddError(err, "network-error")
 		return
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		t.AddError(fmt.Errorf("Status code was %d, expected 200 from host %s", resp.StatusCode, r.addr))
+		t.AddError(fmt.Errorf("Status code was %d, expected 200 from host %s", resp.StatusCode, r.addr), "invalid-status-code")
 		return
 	}
 
