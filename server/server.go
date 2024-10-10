@@ -580,7 +580,6 @@ func sendAndSaveData(t *test) (err error) {
 			continue
 		}
 
-		fmt.Println("sending!!!")
 		err = t.cons[i].WriteJSON(wss)
 		if err != nil {
 			if t.Config.Debug {

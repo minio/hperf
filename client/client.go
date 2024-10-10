@@ -432,7 +432,6 @@ func GetTest(ctx context.Context, c shared.Config) (err error) {
 	})
 
 	if c.Output != "" {
-		fmt.Println("saving:", c.Output)
 		f, err := os.Create(c.Output)
 		if err != nil {
 			return err
