@@ -30,7 +30,6 @@ var requestsCMD = cli.Command{
 	Flags: []cli.Flag{
 		hostsFlag,
 		portFlag,
-		insecureFlag,
 		concurrencyFlag,
 		delayFlag,
 		durationFlag,

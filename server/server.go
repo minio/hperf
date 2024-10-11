@@ -30,7 +30,6 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -410,6 +409,7 @@ type netPerfReader struct {
 	buf []byte
 
 	addr   string
+	ip     string
 	client *http.Client
 
 	TXCount atomic.Uint64
@@ -419,8 +419,10 @@ type netPerfReader struct {
 
 	TTFBH int64
 	TTFBL int64
-	PMSH  int64
-	PMSL  int64
+	RMSH  int64
+	RMSL  int64
+	PH    int64
+	PL    int64
 
 	lastDataPointTime time.Time
 }
@@ -438,7 +440,7 @@ type asyncReader struct {
 func (a *asyncReader) Read(b []byte) (n int, err error) {
 	if !a.ttfbRegistered {
 		a.ttfbRegistered = true
-		since := time.Since(a.start).Milliseconds()
+		since := time.Since(a.start).Microseconds()
 		a.pr.m.Lock()
 		if since > a.pr.TTFBH {
 			a.pr.TTFBH = since
@@ -538,14 +540,14 @@ func sendAndSaveData(t *test) (err error) {
 
 	wss := new(shared.WebsocketSignal)
 	wss.SType = shared.Stats
-	dataResponse := new(shared.DataReponseToClient)
+	wss.DataPoint = new(shared.DataReponseToClient)
 
 	if t.DataFile == nil && t.Config.Save {
 		newTestFile(t)
 	}
 
 	for i := range t.DPS {
-		dataResponse.DPS = append(dataResponse.DPS, t.DPS[i])
+		wss.DataPoint.DPS = append(wss.DataPoint.DPS, t.DPS[i])
 		if t.Config.Save {
 			fileb, err := json.Marshal(t.DPS[i])
 			if err != nil {
@@ -553,28 +555,29 @@ func sendAndSaveData(t *test) (err error) {
 			}
 			t.DataFile.Write(append(fileb, []byte{10}...))
 		}
-		t.DPS = slices.Delete(t.DPS, i, i+1)
 	}
+	t.DPS = make([]shared.DP, 0)
 
-	for i := range t.errors {
-		dataResponse.Errors = append(dataResponse.Errors, t.errors[i])
+	t.M.Lock()
+	errMapClone := make([]shared.TError, 0)
+	for _, v := range t.errors {
+		errMapClone = append(errMapClone, v)
+	}
+	t.errors = make([]shared.TError, 0)
+	t.errMap = make(map[string]struct{})
+	t.M.Unlock()
+
+	for i := range errMapClone {
+		wss.DataPoint.Errors = append(wss.DataPoint.Errors, errMapClone[i])
 		if t.Config.Save {
-			fileb, err := json.Marshal(t.errors[i])
+			fileb, err := json.Marshal(errMapClone[i])
 			if err != nil {
 				t.AddError(err, "error-marshaling")
 			}
 			t.DataFile.Write(append(fileb, []byte{10}...))
 		}
-		t.M.Lock()
-		t.errors = slices.Delete(t.errors, i, i+1)
-		t.M.Unlock()
 	}
 
-	t.M.Lock()
-	t.errMap = make(map[string]struct{})
-	t.M.Unlock()
-
-	wss.DataPoint = dataResponse
 	for i := range t.cons {
 		if t.cons[i] == nil {
 			continue
@@ -616,8 +619,8 @@ func generateDataPoints(t *test) {
 			Remote:            r.addr,
 			TTFBL:             r.TTFBL,
 			TTFBH:             r.TTFBH,
-			PMSL:              r.PMSL,
-			PMSH:              r.PMSH,
+			RMSL:              r.RMSL,
+			RMSH:              r.RMSH,
 			ErrCount:          len(t.errors),
 			DroppedPackets:    droppedPackets,
 			MemoryUsedPercent: int(currentMemoryStat.UsedPercent),
@@ -626,9 +629,9 @@ func generateDataPoints(t *test) {
 
 		r.m.Lock()
 		r.TTFBH = 0
-		r.TTFBL = 999
-		r.PMSH = 0
-		r.PMSL = 999
+		r.TTFBL = 99999999
+		r.RMSH = 0
+		r.RMSL = 99999999
 		r.m.Unlock()
 
 		t.DPS = append(t.DPS, d)
@@ -666,8 +669,9 @@ type dialContext func(ctx context.Context, network, address string) (net.Conn, e
 func newPerformanceReaderForASingleHost(c *shared.Config, host string, port string) (r *netPerfReader) {
 	r = new(netPerfReader)
 	r.addr = net.JoinHostPort(host, port)
+	r.ip = host
 	r.buf = make([]byte, c.PayloadSize)
-	r.TTFBL = 999
+	r.TTFBL = 99999999
 	r.client = &http.Client{
 		Transport: newTransport(c),
 	}
@@ -717,9 +721,9 @@ func sendRequestToHost(t *test, r *netPerfReader, cid int) {
 	var resp *http.Response
 	var err error
 
-	proto := "http://"
-	if !t.Config.Insecure {
-		proto = "https://"
+	proto := "https://"
+	if t.Config.Insecure {
+		proto = "http://"
 	}
 
 	route := "/404"
@@ -768,15 +772,15 @@ func sendRequestToHost(t *test, r *netPerfReader, cid int) {
 		return
 	}
 
-	done := time.Since(sent).Milliseconds()
+	done := time.Since(sent).Microseconds()
 
 	r.m.Lock()
-	if done > r.PMSH {
-		r.PMSH = done
+	if done > r.RMSH {
+		r.RMSH = done
 	}
 
-	if done < r.PMSL {
-		r.PMSL = done
+	if done < r.RMSL {
+		r.RMSL = done
 	}
 	r.m.Unlock()
 

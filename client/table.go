@@ -65,12 +65,12 @@ func initHeaders() {
 	headerSlice[Created] = header{"Created", 8}
 	headerSlice[Local] = header{"Local", 15}
 	headerSlice[Remote] = header{"Remote", 15}
-	headerSlice[PMSH] = header{"PMSH", 4}
-	headerSlice[PMSL] = header{"PMSL", 4}
-	headerSlice[TTFBH] = header{"TTFBH", 5}
-	headerSlice[TTFBL] = header{"TTFBL", 5}
-	headerSlice[TX] = header{"TX", 9}
-	headerSlice[TXCount] = header{"#TX", 6}
+	headerSlice[PMSH] = header{"RMSH", 8}
+	headerSlice[PMSL] = header{"RMSL", 8}
+	headerSlice[TTFBH] = header{"TTFBH", 8}
+	headerSlice[TTFBL] = header{"TTFBL", 8}
+	headerSlice[TX] = header{"TX", 10}
+	headerSlice[TXCount] = header{"#TX", 10}
 	headerSlice[ErrCount] = header{"#ERR", 6}
 	headerSlice[DroppedPackets] = header{"#Dropped", 9}
 	headerSlice[MemoryUsage] = header{"MemUsed", 7}
@@ -148,8 +148,8 @@ func printTableRow(style lipgloss.Style, entry *shared.DP, t shared.TestType) {
 			column{entry.Created.Format("15:04:05"), headerSlice[Created].width},
 			column{strings.Split(entry.Local, ":")[0], headerSlice[Local].width},
 			column{strings.Split(entry.Remote, ":")[0], headerSlice[Remote].width},
-			column{formatInt(entry.PMSH), headerSlice[PMSH].width},
-			column{formatInt(entry.PMSL), headerSlice[PMSL].width},
+			column{formatInt(entry.RMSH), headerSlice[PMSH].width},
+			column{formatInt(entry.RMSL), headerSlice[PMSL].width},
 			column{formatUint(entry.TXCount), headerSlice[TXCount].width},
 			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
 			column{formatInt(int64(entry.DroppedPackets)), headerSlice[DroppedPackets].width},
@@ -176,8 +176,8 @@ func printTableRow(style lipgloss.Style, entry *shared.DP, t shared.TestType) {
 			column{entry.Created.Format("15:04:05"), headerSlice[Created].width},
 			column{strings.Split(entry.Local, ":")[0], headerSlice[Local].width},
 			column{strings.Split(entry.Remote, ":")[0], headerSlice[Remote].width},
-			column{formatInt(entry.PMSH), headerSlice[PMSH].width},
-			column{formatInt(entry.PMSL), headerSlice[PMSL].width},
+			column{formatInt(entry.RMSH), headerSlice[PMSH].width},
+			column{formatInt(entry.RMSL), headerSlice[PMSL].width},
 			column{formatInt(entry.TTFBH), headerSlice[TTFBH].width},
 			column{formatInt(entry.TTFBL), headerSlice[TTFBH].width},
 			column{shared.BandwidthBytesToString(entry.TX), headerSlice[TX].width},

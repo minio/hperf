@@ -35,7 +35,6 @@ var bandwidthCMD = cli.Command{
 		testIDFlag,
 		bufferSizeFlag,
 		payloadSizeFlag,
-		insecureFlag,
 		restartOnErrorFlag,
 		dnsServerFlag,
 		saveTestFlag,

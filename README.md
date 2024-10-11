@@ -98,10 +98,10 @@ NOTE: Be careful not to re-use the ID's if you care about fetching results at a 
 ```
 
 ## Available Statistics
- - Payload Roundtrip (PMS high/low): 
-   - Payload transfer time (Milliseconds)
+ - Payload Roundtrip (RMS high/low): 
+   - Payload transfer time (Microseconds)
  - Time to first byte (TTFB high/low): 
-   - This is the amount of time (Milliseconds) it takes between a request being made and the first byte being requested by the receiver
+   - This is the amount of time (Microseconds) it takes between a request being made and the first byte being requested by the receiver
  - Transferred bytes (TX): 
    - Bandwidth throughput in KB/s, MB/s, GB/s, etc..
  - Request count (#TX): 
