@@ -421,8 +421,6 @@ type netPerfReader struct {
 	TTFBL int64
 	RMSH  int64
 	RMSL  int64
-	PH    int64
-	PL    int64
 
 	lastDataPointTime time.Time
 }
