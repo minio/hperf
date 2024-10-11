@@ -88,7 +88,10 @@ NOTE: Be careful not to re-use the ID's if you care about fetching results at a 
 # get test results
 ./hperf stat --hosts 1.1.1.{1...100} --id [my_test_id]
 # save test results
-./hperf stat --hosts 1.1.1.{1...100} --id [my_test_id] --output /tmp/file
+./hperf stat --hosts 1.1.1.{1...100} --id [my_test_id] --output /tmp/test.out
+
+# analyze test results
+./hperf analyze --file /tmp/test.out
 
 # listen in on a running test
 ./hperf listen --hosts 1.1.1.{1...100} --id [my_test_id]
@@ -96,6 +99,13 @@ NOTE: Be careful not to re-use the ID's if you care about fetching results at a 
 # stop a running test
 ./hperf stop --hosts 1.1.1.{1...100} --id [my_test_id]
 ```
+
+## Analysis
+The analyze command will print statistics for the 10th and 90th percentiles and all datapoints in between. 
+The format used is:
+ - 10th percentile: total, low, avarage, high
+ - in between: total, low, avarage, high
+ - 90th percentile: total, low, avarage, high
 
 ## Available Statistics
  - Payload Roundtrip (RMS high/low): 

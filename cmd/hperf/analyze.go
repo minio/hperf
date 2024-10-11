@@ -140,6 +140,10 @@ func AnalyzeTest(ctx context.Context, c shared.Config) (err error) {
 		}
 	}
 
+	for i := range errors {
+		client.PrintTError(errors[i])
+	}
+
 	printBracker(dps10stats, "? < 10%", client.SuccessStyle)
 	printBracker(dps50stats, "10% < ? < 90%", client.WarningStyle)
 	printBracker(dps90stats, "? > 90%", client.ErrorStyle)
