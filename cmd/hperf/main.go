@@ -27,7 +27,9 @@ import (
 	"os/signal"
 	"runtime"
 	"syscall"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/minio/cli"
 	"github.com/minio/hperf/client"
 	"github.com/minio/hperf/shared"
@@ -60,6 +62,7 @@ func InvalidFlagValueError(value interface{}, name string) error {
 
 var (
 	debug       = false
+	insecure    = false
 	globalFlags = []cli.Flag{
 		hostsFlag,
 		portFlag,
@@ -138,6 +141,10 @@ var (
 		Name:  "output",
 		Usage: "set output file path/name",
 	}
+	fileFlag = cli.StringFlag{
+		Name:  "file",
+		Usage: "input file path",
+	}
 	saveTestFlag = cli.BoolTFlag{
 		Name:   "save",
 		EnvVar: "HPERF_SAVE",
@@ -153,17 +160,19 @@ var (
 var (
 	baseFlags = []cli.Flag{
 		debugFlag,
+		insecureFlag,
 	}
 	Commands = []cli.Command{
-		serverCMD,
+		analyzeCMD,
 		bandwidthCMD,
-		requestsCMD,
+		deleteCMD,
 		latencyCMD,
 		listenCMD,
 		listTestsCMD,
+		requestsCMD,
+		serverCMD,
 		statTestsCMD,
 		stopCMD,
-		deleteCMD,
 	}
 )
 
@@ -205,6 +214,7 @@ var (
 
 func before(ctx *cli.Context) error {
 	debug = ctx.Bool("debug")
+	insecure = ctx.Bool("insecure")
 	GlobalContext, GlobalCancelFunc = context.WithCancelCause(context.Background())
 	go handleOSSignal(GlobalCancelFunc)
 	return nil
@@ -225,11 +235,12 @@ func parseConfig(ctx *cli.Context) (*shared.Config, error) {
 	config = &shared.Config{
 		DialTimeout:    0,
 		Debug:          debug,
+		Hosts:          hosts,
+		Insecure:       insecure,
 		TestType:       shared.LatencyTest,
 		Duration:       ctx.Int(durationFlag.Name),
 		RequestDelay:   ctx.Int(delayFlag.Name),
 		Concurrency:    ctx.Int(concurrencyFlag.Name),
-		Insecure:       ctx.Bool(insecureFlag.Name),
 		Proc:           ctx.Int(concurrencyFlag.Name),
 		PayloadSize:    ctx.Int(payloadSizeFlag.Name),
 		BufferKB:       ctx.Int(bufferSizeFlag.Name),
@@ -237,18 +248,21 @@ func parseConfig(ctx *cli.Context) (*shared.Config, error) {
 		Save:           ctx.BoolT(saveTestFlag.Name),
 		TestID:         ctx.String(testIDFlag.Name),
 		RestartOnError: ctx.BoolT(restartOnErrorFlag.Name),
-		Hosts:          hosts,
 		Output:         ctx.String(outputFlag.Name),
+		File:           ctx.String(fileFlag.Name),
 	}
 
-	if ctx.String("id") == "" {
-		switch ctx.Command.Name {
-		case "latency", "bandwidth", "http":
-			err = errors.New("--id is required")
-		case "get":
-			err = errors.New("--id is required")
-		default:
+	switch ctx.Command.Name {
+	case "latency", "bandwidth", "http", "get":
+		if ctx.String("id") == "" {
+			uid := uuid.NewString()
+			config.TestID = uid + "-" + time.Now().Format("2006-01-02-15-04-05")
 		}
+	case "analyze":
+		if ctx.String("file") == "" {
+			err = errors.New("--file is required")
+		}
+	default:
 	}
 
 Error:

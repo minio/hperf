@@ -42,7 +42,7 @@ FLAGS:
   {{range .VisibleFlags}}{{.}}
   {{end}}
 EXAMPLES:
-  1. List all test on the '10.10.10.1':
+  1. List all test on the '10.10.10.1' host:
     {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1
 `,
 }

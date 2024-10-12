@@ -19,6 +19,7 @@ package shared
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -115,8 +116,8 @@ type DP struct {
 	Created           time.Time
 	Local             string
 	Remote            string
-	PMSH              int64
-	PMSL              int64
+	RMSH              int64
+	RMSL              int64
 	TTFBH             int64
 	TTFBL             int64
 	TX                uint64
@@ -127,7 +128,7 @@ type DP struct {
 	CPUUsedPercent    int
 
 	// Client only
-	Received time.Time
+	Received time.Time `json:"-"`
 }
 
 type DataReponseToClient struct {
@@ -152,6 +153,7 @@ type Config struct {
 	Insecure       bool          `json:"Insecure"`
 	TestType       TestType      `json:"TestType"`
 	Output         string        `json:"Output"`
+	File           string        `json:"File"`
 	// AllowLocalInterface bool          `json:"AllowLocalInterfaces"`
 
 	// Client Only
@@ -283,4 +285,13 @@ func GetInterfaceAddresses() (list []string, err error) {
 	}
 
 	return
+}
+
+func WriteStructAndNewLineToFile(f *os.File, s interface{}) (int, error) {
+	outb, err := json.Marshal(s)
+	if err != nil {
+		return 0, err
+	}
+	n, err := f.Write(append(outb, []byte{10}...))
+	return n, err
 }

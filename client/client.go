@@ -18,6 +18,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -165,9 +166,14 @@ func handleWSConnection(ctx context.Context, c *shared.Config, host string, id i
 
 	shared.DEBUG(WarningStyle.Render("Connecting to ", host, ":", c.Port))
 
+	connectString := "wss://" + host + ":" + c.Port + "/ws/" + host
+	if c.Insecure {
+		connectString = "ws://" + host + ":" + c.Port + "/ws/" + host
+	}
+
 	con, _, dialErr := dialer.DialContext(
 		ctx,
-		"ws://"+host+":"+c.Port+"/ws/"+host,
+		connectString,
 		nil)
 	if dialErr != nil {
 		PrintError(dialErr)
@@ -232,18 +238,27 @@ func PrintError(err error) {
 	fmt.Println(ErrorStyle.Render("ERROR: ", err.Error()))
 }
 
-func receiveJSONDataPoint(data []byte, c *shared.Config) {
+func receiveJSONDataPoint(data []byte, _ *shared.Config) {
 	responseLock.Lock()
 	defer responseLock.Unlock()
 
-	dp := new(shared.DP)
-	err := json.Unmarshal(data, &dp)
-	if err != nil {
-		PrintError(err)
-		return
+	if bytes.Contains(data, []byte("Error")) {
+		dp := new(shared.TError)
+		err := json.Unmarshal(data, &dp)
+		if err != nil {
+			PrintError(err)
+			return
+		}
+		responseERR = append(responseERR, *dp)
+	} else {
+		dp := new(shared.DP)
+		err := json.Unmarshal(data, &dp)
+		if err != nil {
+			PrintError(err)
+			return
+		}
+		responseDPS = append(responseDPS, *dp)
 	}
-
-	responseDPS = append(responseDPS, *dp)
 }
 
 func keepAliveLoop(ctx context.Context, tickerfunc func() (shouldExit bool)) error {
@@ -418,10 +433,13 @@ func GetTest(ctx context.Context, c shared.Config) (err error) {
 
 	_ = keepAliveLoop(ctx, nil)
 
-	if len(responseDPS) < 1 {
-		PrintErrorString("No datapoints found")
-		return
-	}
+	slices.SortFunc(responseERR, func(a shared.TError, b shared.TError) int {
+		if a.Created.Before(b.Created) {
+			return -1
+		} else {
+			return 1
+		}
+	})
 
 	slices.SortFunc(responseDPS, func(a shared.DP, b shared.DP) int {
 		if a.Created.Before(b.Created) {
@@ -437,12 +455,13 @@ func GetTest(ctx context.Context, c shared.Config) (err error) {
 			return err
 		}
 		for i := range responseDPS {
-			outb, err := json.Marshal(responseDPS[i])
+			_, err := shared.WriteStructAndNewLineToFile(f, responseDPS[i])
 			if err != nil {
-				PrintError(err)
-				continue
+				return err
 			}
-			_, err = f.Write(append(outb, []byte{10}...))
+		}
+		for i := range responseERR {
+			_, err := shared.WriteStructAndNewLineToFile(f, responseERR[i])
 			if err != nil {
 				return err
 			}
@@ -458,6 +477,10 @@ func GetTest(ctx context.Context, c shared.Config) (err error) {
 		sp2 := strings.Split(sp1[0], ".")
 		s1 := lipgloss.NewStyle().Background(lipgloss.Color(getHex(sp2[len(sp2)-1])))
 		printTableRow(s1, &dp, dp.Type)
+	}
+
+	for i := range responseERR {
+		PrintTError(responseERR[i])
 	}
 
 	return nil

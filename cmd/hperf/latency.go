@@ -30,7 +30,6 @@ var latencyCMD = cli.Command{
 	Flags: []cli.Flag{
 		hostsFlag,
 		portFlag,
-		insecureFlag,
 		concurrencyFlag,
 		delayFlag,
 		durationFlag,
@@ -55,7 +54,7 @@ EXAMPLES:
    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
 
   2. Run a slow moving test to probe latency:
-   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --delay 100
+   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --request-delay 100 --concurrency 1
 `,
 }
 
