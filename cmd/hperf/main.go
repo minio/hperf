@@ -26,10 +26,10 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"syscall"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/minio/cli"
 	"github.com/minio/hperf/client"
 	"github.com/minio/hperf/shared"
@@ -137,10 +137,6 @@ var (
 		Name:  "id",
 		Usage: "specify custom ID per test",
 	}
-	outputFlag = cli.StringFlag{
-		Name:  "output",
-		Usage: "set output file path/name",
-	}
 	fileFlag = cli.StringFlag{
 		Name:  "file",
 		Usage: "input file path",
@@ -154,6 +150,14 @@ var (
 		Name:   "dns-server",
 		EnvVar: "HPERF_DNS_SERVER",
 		Usage:  "use a custom DNS server to resolve hosts",
+	}
+	printStatsFlag = cli.BoolFlag{
+		Name:  "print-stats",
+		Usage: "Print stat points",
+	}
+	printErrFlag = cli.BoolFlag{
+		Name:  "print-errors",
+		Usage: "Print errors",
 	}
 )
 
@@ -171,7 +175,7 @@ var (
 		listTestsCMD,
 		requestsCMD,
 		serverCMD,
-		statTestsCMD,
+		statDownloadCMD,
 		stopCMD,
 	}
 )
@@ -248,15 +252,22 @@ func parseConfig(ctx *cli.Context) (*shared.Config, error) {
 		Save:           ctx.BoolT(saveTestFlag.Name),
 		TestID:         ctx.String(testIDFlag.Name),
 		RestartOnError: ctx.BoolT(restartOnErrorFlag.Name),
-		Output:         ctx.String(outputFlag.Name),
 		File:           ctx.String(fileFlag.Name),
+		PrintFull:      ctx.Bool(printStatsFlag.Name),
+		PrintErrors:    ctx.Bool(printErrFlag.Name),
 	}
 
 	switch ctx.Command.Name {
 	case "latency", "bandwidth", "http", "get":
 		if ctx.String("id") == "" {
-			uid := uuid.NewString()
-			config.TestID = uid + "-" + time.Now().Format("2006-01-02-15-04-05")
+			config.TestID = strconv.Itoa(int(time.Now().Unix()))
+		}
+	case "download":
+		if ctx.String("id") == "" {
+			err = errors.New("--id is required")
+		}
+		if ctx.String("file") == "" {
+			err = errors.New("--file is required")
 		}
 	case "analyze":
 		if ctx.String("file") == "" {

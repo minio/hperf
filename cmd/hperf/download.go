@@ -22,16 +22,16 @@ import (
 	"github.com/minio/hperf/client"
 )
 
-var statTestsCMD = cli.Command{
-	Name:   "stat",
-	Usage:  "print stats for a given test from the selected hosts",
-	Action: runStat,
+var statDownloadCMD = cli.Command{
+	Name:   "download",
+	Usage:  "Download stats for tests by ID",
+	Action: runDownload,
 	Flags: []cli.Flag{
 		dnsServerFlag,
 		hostsFlag,
 		portFlag,
 		testIDFlag,
-		outputFlag,
+		fileFlag,
 	},
 	CustomHelpTemplate: `NAME:
   {{.HelpName}} - {{.Usage}}
@@ -43,18 +43,16 @@ FLAGS:
   {{range .VisibleFlags}}{{.}}
   {{end}}
 EXAMPLES:
-  1. Print stats by ID for hosts '10.10.10.1' and '10.10.10.2':
-    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --id my_test_id
-  2. Save stats by ID for hosts '10.10.10.1' and '10.10.10.2':
-    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --id my_test_id --output /tmp/output-file
+  1. Download test by ID for hosts '10.10.10.1' and '10.10.10.2':
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --id my_test_id --file /tmp/output-file
 `,
 }
 
-func runStat(ctx *cli.Context) error {
+func runDownload(ctx *cli.Context) error {
 	config, err := parseConfig(ctx)
 	if err != nil {
 		return err
 	}
 
-	return client.GetTest(GlobalContext, *config)
+	return client.DownloadTest(GlobalContext, *config)
 }
