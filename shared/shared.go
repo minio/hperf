@@ -50,6 +50,23 @@ type TestInfo struct {
 	Time time.Time
 }
 
+type TestOutput struct {
+	ErrCount int
+	TXC      uint64
+	TXL      uint64
+	TXH      uint64
+	TXT      uint64
+	RMSL     int64
+	RMSH     int64
+	TTFBL    int64
+	TTFBH    int64
+	DP       int
+	ML       int
+	MH       int
+	CL       int
+	CH       int
+}
+
 type (
 	SignalType int
 	SignalCode int
@@ -121,6 +138,7 @@ type DP struct {
 	TTFBH             int64
 	TTFBL             int64
 	TX                uint64
+	TXTotal           uint64
 	TXCount           uint64
 	ErrCount          int
 	DroppedPackets    int
@@ -152,12 +170,13 @@ type Config struct {
 	Save           bool          `json:"Save"`
 	Insecure       bool          `json:"Insecure"`
 	TestType       TestType      `json:"TestType"`
-	Output         string        `json:"Output"`
 	File           string        `json:"File"`
 	// AllowLocalInterface bool          `json:"AllowLocalInterfaces"`
 
 	// Client Only
 	ResolveHosts string `json:"-"`
+	PrintFull    bool   `json:"-"`
+	PrintErrors  bool   `json:"-"`
 }
 
 func INFO(items ...any) {

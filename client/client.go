@@ -18,11 +18,13 @@
 package client
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"runtime/debug"
@@ -209,7 +211,7 @@ func handleWSConnection(ctx context.Context, c *shared.Config, host string, id i
 		}
 		switch signal.SType {
 		case shared.Stats:
-			go praseDataPoint(signal.DataPoint, c)
+			go collectDataPointv2(signal.DataPoint)
 		case shared.ListTests:
 			go parseTestList(signal.TestList)
 		case shared.GetTest:
@@ -261,9 +263,13 @@ func receiveJSONDataPoint(data []byte, _ *shared.Config) {
 	}
 }
 
-func keepAliveLoop(ctx context.Context, tickerfunc func() (shouldExit bool)) error {
+func keepAliveLoop(ctx context.Context, c *shared.Config, tickerfunc func() (shouldExit bool)) error {
+	start := time.Now()
 	for ctx.Err() == nil {
 		time.Sleep(1 * time.Second)
+		if time.Since(start).Seconds() > float64(c.Duration)+20 {
+			return errors.New("Total duration reached 20 seconds past the configured duration")
+		}
 
 		select {
 		case <-ctx.Done():
@@ -298,7 +304,7 @@ func Listen(ctx context.Context, c shared.Config) (err error) {
 		}
 	})
 
-	return keepAliveLoop(ctx, nil)
+	return keepAliveLoop(ctx, &c, nil)
 }
 
 func Stop(ctx context.Context, c shared.Config) (err error) {
@@ -316,7 +322,7 @@ func Stop(ctx context.Context, c shared.Config) (err error) {
 		}
 	})
 
-	return keepAliveLoop(ctx, nil)
+	return keepAliveLoop(ctx, &c, nil)
 }
 
 func RunTest(ctx context.Context, c shared.Config) (err error) {
@@ -334,7 +340,74 @@ func RunTest(ctx context.Context, c shared.Config) (err error) {
 		}
 	})
 
-	return keepAliveLoop(ctx, nil)
+	printCount := 0
+
+	printOnTick := func() bool {
+		if len(responseDPS) == 0 {
+			return false
+		}
+		printCount++
+
+		to := new(shared.TestOutput)
+		to.ErrCount = len(responseERR)
+		to.TXL = math.MaxInt64
+		to.RMSL = math.MaxInt64
+		to.TTFBL = math.MaxInt64
+		to.ML = responseDPS[0].MemoryUsedPercent
+		to.CL = responseDPS[0].CPUUsedPercent
+		tt := responseDPS[0].Type
+
+		for i := range responseDPS {
+			to.TXC += responseDPS[i].TXCount
+			to.TXT += responseDPS[i].TXTotal
+			to.DP += responseDPS[i].DroppedPackets
+
+			if to.TXL > responseDPS[i].TX {
+				to.TXL = responseDPS[i].TX
+			}
+			if to.RMSL > responseDPS[i].RMSL {
+				to.RMSL = responseDPS[i].RMSL
+			}
+			if to.TTFBL > responseDPS[i].TTFBL {
+				to.TTFBL = responseDPS[i].TTFBL
+			}
+			if to.ML > responseDPS[i].MemoryUsedPercent {
+				to.ML = responseDPS[i].MemoryUsedPercent
+			}
+			if to.CL > responseDPS[i].CPUUsedPercent {
+				to.CL = responseDPS[i].CPUUsedPercent
+			}
+
+			if to.TXH < responseDPS[i].TX {
+				to.TXH = responseDPS[i].TX
+			}
+			if to.RMSH < responseDPS[i].RMSH {
+				to.RMSH = responseDPS[i].RMSH
+			}
+			if to.TTFBH < responseDPS[i].TTFBH {
+				to.TTFBH = responseDPS[i].TTFBH
+			}
+			if to.MH < responseDPS[i].MemoryUsedPercent {
+				to.MH = responseDPS[i].MemoryUsedPercent
+			}
+			if to.CH < responseDPS[i].CPUUsedPercent {
+				to.CH = responseDPS[i].CPUUsedPercent
+			}
+		}
+
+		for i := range responseERR {
+			fmt.Println(responseERR[i])
+		}
+
+		if printCount%10 == 1 {
+			printRealTimeHeaders(tt)
+		}
+		printRealTimeRow(SuccessStyle, to, tt)
+
+		return false
+	}
+
+	return keepAliveLoop(ctx, &c, printOnTick)
 }
 
 func ListTests(ctx context.Context, c shared.Config) (err error) {
@@ -352,7 +425,7 @@ func ListTests(ctx context.Context, c shared.Config) (err error) {
 		}
 	})
 
-	err = keepAliveLoop(ctx, nil)
+	err = keepAliveLoop(ctx, &c, nil)
 	if err != nil {
 		return
 	}
@@ -400,7 +473,7 @@ func DeleteTests(ctx context.Context, c shared.Config) (err error) {
 		}
 	})
 
-	return keepAliveLoop(ctx, nil)
+	return keepAliveLoop(ctx, &c, nil)
 }
 
 func parseTestList(list []shared.TestInfo) {
@@ -415,7 +488,7 @@ func parseTestList(list []shared.TestInfo) {
 	}
 }
 
-func GetTest(ctx context.Context, c shared.Config) (err error) {
+func DownloadTest(ctx context.Context, c shared.Config) (err error) {
 	cancelContext, cancel := context.WithCancel(ctx)
 	defer cancel()
 	err = initializeClient(cancelContext, &c)
@@ -431,7 +504,7 @@ func GetTest(ctx context.Context, c shared.Config) (err error) {
 		}
 	})
 
-	_ = keepAliveLoop(ctx, nil)
+	_ = keepAliveLoop(ctx, &c, nil)
 
 	slices.SortFunc(responseERR, func(a shared.TError, b shared.TError) int {
 		if a.Created.Before(b.Created) {
@@ -449,39 +522,143 @@ func GetTest(ctx context.Context, c shared.Config) (err error) {
 		}
 	})
 
-	if c.Output != "" {
-		f, err := os.Create(c.Output)
+	f, err := os.Create(c.File)
+	if err != nil {
+		return err
+	}
+	for i := range responseDPS {
+		_, err := shared.WriteStructAndNewLineToFile(f, responseDPS[i])
 		if err != nil {
 			return err
 		}
-		for i := range responseDPS {
-			_, err := shared.WriteStructAndNewLineToFile(f, responseDPS[i])
-			if err != nil {
-				return err
-			}
-		}
-		for i := range responseERR {
-			_, err := shared.WriteStructAndNewLineToFile(f, responseERR[i])
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
 	}
-
-	printDataPointHeaders(responseDPS[0].Type)
-	for i := range responseDPS {
-		dp := responseDPS[i]
-		sp1 := strings.Split(dp.Local, ":")
-		sp2 := strings.Split(sp1[0], ".")
-		s1 := lipgloss.NewStyle().Background(lipgloss.Color(getHex(sp2[len(sp2)-1])))
-		printTableRow(s1, &dp, dp.Type)
-	}
-
 	for i := range responseERR {
-		PrintTError(responseERR[i])
+		_, err := shared.WriteStructAndNewLineToFile(f, responseERR[i])
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
+}
+
+func AnalyzeTest(ctx context.Context, c shared.Config) (err error) {
+	_, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	f, err := os.Open(c.File)
+	if err != nil {
+		return err
+	}
+
+	dps := make([]shared.DP, 0)
+	errors := make([]shared.TError, 0)
+
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		b := s.Bytes()
+		if !bytes.Contains(b, []byte("Error")) {
+			dp := new(shared.DP)
+			err := json.Unmarshal(b, dp)
+			if err != nil {
+				return err
+			}
+			dps = append(dps, *dp)
+		} else {
+			dperr := new(shared.TError)
+			err := json.Unmarshal(b, dperr)
+			if err != nil {
+				return err
+			}
+			errors = append(errors, *dperr)
+		}
+	}
+
+	if c.PrintFull {
+		printDataPointHeaders(dps[0].Type)
+		for i := range dps {
+			dp := dps[i]
+			sp1 := strings.Split(dp.Local, ":")
+			sp2 := strings.Split(sp1[0], ".")
+			s1 := lipgloss.NewStyle().Background(lipgloss.Color(getHex(sp2[len(sp2)-1])))
+			printTableRow(s1, &dp, dp.Type)
+		}
+	}
+
+	if c.PrintErrors {
+		for i := range errors {
+			PrintTError(errors[i])
+		}
+	}
+
+	dps10 := math.Ceil((float64(len(dps)) / 100) * 10)
+	dps90 := math.Floor((float64(len(dps)) / 100) * 90)
+
+	slices.SortFunc(dps, func(a shared.DP, b shared.DP) int {
+		if a.RMSH < b.RMSH {
+			return -1
+		} else {
+			return 1
+		}
+	})
+
+	dps10s := make([]shared.DP, 0)
+	dps50s := make([]shared.DP, 0)
+	dps90s := make([]shared.DP, 0)
+
+	// total, sum, low, mean, high
+	dps10stats := []int64{0, 0, math.MaxInt64, 0, 0}
+	dps50stats := []int64{0, 0, math.MaxInt64, 0, 0}
+	dps90stats := []int64{0, 0, math.MaxInt64, 0, 0}
+
+	for i := range dps {
+		if i <= int(dps10) {
+			dps10s = append(dps10s, dps[i])
+			updateBracketStats(dps10stats, dps[i])
+		} else if i >= int(dps90) {
+			dps90s = append(dps90s, dps[i])
+			updateBracketStats(dps90stats, dps[i])
+		} else {
+			dps50s = append(dps50s, dps[i])
+			updateBracketStats(dps50stats, dps[i])
+		}
+	}
+
+	fmt.Println("")
+	fmt.Println("")
+	fmt.Println("")
+
+	fmt.Println(" First 10% of data points")
+	printBracker(dps10stats, SuccessStyle)
+	fmt.Println("")
+	fmt.Println(" Between 10% and 90%")
+	printBracker(dps50stats, WarningStyle)
+	fmt.Println("")
+	fmt.Println(" Last 10% of data points")
+	printBracker(dps90stats, ErrorStyle)
+	fmt.Println("")
+	return nil
+}
+
+func printBracker(b []int64, style lipgloss.Style) {
+	fmt.Println(style.Render(
+		fmt.Sprintf(" Total %d | Low %d | Avg %d | High %d | Microseconds ",
+			b[0],
+			b[2],
+			b[3],
+			b[4],
+		),
+	))
+}
+
+func updateBracketStats(b []int64, dp shared.DP) {
+	b[0]++
+	b[1] += dp.RMSH
+	if dp.RMSH < b[2] {
+		b[2] = dp.RMSH
+	}
+	b[3] = b[1] / b[0]
+	if dp.RMSH > b[4] {
+		b[4] = dp.RMSH
+	}
 }

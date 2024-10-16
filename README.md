@@ -85,13 +85,13 @@ host per file line.
 NOTE: Be careful not to re-use the ID's if you care about fetching results at a later date.
 
 ```bash
-# get test results
-./hperf stat --hosts 1.1.1.{1...100} --id [my_test_id]
-# save test results
-./hperf stat --hosts 1.1.1.{1...100} --id [my_test_id] --output /tmp/test.out
+# download test results
+./hperf download --hosts 1.1.1.{1...100} --id [my_test_id] --file /tmp/test.out
 
 # analyze test results
 ./hperf analyze --file /tmp/test.out
+# analyze test results with full print output
+./hperf analyze --file /tmp/test.out --print-stats --print-errors
 
 # listen in on a running test
 ./hperf listen --hosts 1.1.1.{1...100} --id [my_test_id]
@@ -107,23 +107,22 @@ The format used is:
  - in between: total, low, avarage, high
  - 90th percentile: total, low, avarage, high
 
-## Available Statistics
+## Statistics
  - Payload Roundtrip (RMS high/low): 
    - Payload transfer time (Microseconds)
  - Time to first byte (TTFB high/low): 
    - This is the amount of time (Microseconds) it takes between a request being made and the first byte being requested by the receiver
- - Transferred bytes (TX): 
+ - Transferred bytes (TX high/low): 
    - Bandwidth throughput in KB/s, MB/s, GB/s, etc..
+ - Transferred bytes (TX total): 
+   - Total transferred bytes (not per second)
  - Request count (#TX): 
    - The number of HTTP/s requests made
  - Error Count (#ERR): 
    - Number of encountered errors
  - Dropped Packets (#Dropped): 
-   - Total dropped packets on the server (total for all time)
- - Memory (MemUsed): 
-   - Total memory in use (total for all time)
- - CPU (CPUUsed): 
-   - Total memory in use (total for all time)
+ - Memory (Mem high/low/used): 
+ - CPU (CPU high/low/used): 
 
 ## Example: 20 second HTTP payload transfer test using multiple sockets
 This test will use 12 concurrent workers to send http requests with a payload without any timeout between requests.
@@ -138,11 +137,11 @@ This will perform a 20 second bandwidth test with 12 concurrent HTTP streams:
 $ ./hperf bandwidth --hosts file:./hosts --id http-test-2 --duration 20 --concurrency 12
 ```
 
-## Example: 5 Minute latency test using a 2000 Byte buffer, with a delay of 50ms between requests
+## Example: 5 Minute latency test using a 1000 Byte buffer, with a delay of 50ms between requests
 This test will send a single round trip request between servers to test base latency and reachability:
 ```
 $ ./hperf latency --hosts file:./hosts --id http-test-2 --duration 360 --concurrency 1 --requestDelay 50
---bufferSize 2000 --payloadSize 2000
+--bufferSize 1000 --payloadSize 1000
 ```
 
 

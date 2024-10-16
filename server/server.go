@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -54,6 +55,7 @@ var (
 		WriteBufferSize:       1000000,
 	})
 	bindAddress      = "0.0.0.0:9000"
+	realIP           = ""
 	testFolderSuffix = "hperf-tests"
 	basePath         = "./"
 	tests            = make([]*test, 0)
@@ -97,7 +99,7 @@ func (t *test) AddError(err error, id string) {
 	t.errMap[id] = struct{}{}
 }
 
-func RunServer(ctx context.Context, address string, storagePath string) (err error) {
+func RunServer(ctx context.Context, address string, rIP string, storagePath string) (err error) {
 	cancelContext, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -128,6 +130,7 @@ func RunServer(ctx context.Context, address string, storagePath string) (err err
 	}
 
 	bindAddress = address
+	realIP = rIP
 	shared.INFO("starting 'hperf' server on:", bindAddress)
 	err = startAPIandWS(cancelContext)
 	if err != nil {
@@ -385,7 +388,11 @@ func newTest(c *shared.Config) (t *test, err error) {
 
 	for i := range c.Hosts {
 
-		if net.JoinHostPort(c.Hosts[i], c.Port) == bindAddress {
+		joinedHostPort := net.JoinHostPort(c.Hosts[i], c.Port)
+		if realIP != "" && strings.Contains(joinedHostPort, realIP) {
+			continue
+		}
+		if joinedHostPort == bindAddress {
 			continue
 		}
 		t.Readers = append(t.Readers,
@@ -404,7 +411,8 @@ func newTest(c *shared.Config) (t *test, err error) {
 }
 
 type netPerfReader struct {
-	m sync.Mutex
+	hasStats bool
+	m        sync.Mutex
 
 	buf []byte
 
@@ -436,18 +444,19 @@ type asyncReader struct {
 }
 
 func (a *asyncReader) Read(b []byte) (n int, err error) {
+	a.pr.m.Lock()
 	if !a.ttfbRegistered {
-		a.ttfbRegistered = true
 		since := time.Since(a.start).Microseconds()
-		a.pr.m.Lock()
+		a.ttfbRegistered = true
 		if since > a.pr.TTFBH {
 			a.pr.TTFBH = since
 		}
 		if since < a.pr.TTFBL {
 			a.pr.TTFBL = since
 		}
-		a.pr.m.Unlock()
 	}
+	a.pr.hasStats = true
+	a.pr.m.Unlock()
 
 	if a.ctx.Err() != nil {
 		return 0, io.EOF
@@ -488,7 +497,9 @@ func createAndRunTest(con *websocket.Conn, signal shared.WebsocketSignal) {
 		go startPerformanceReader(test, test.Readers[i])
 	}
 
-	listenToLiveTests(con, signal)
+	conUID := uuid.NewString()
+	test.cons[conUID] = con
+
 	for {
 		if test.ctx.Err() != nil {
 			return
@@ -557,18 +568,18 @@ func sendAndSaveData(t *test) (err error) {
 	t.DPS = make([]shared.DP, 0)
 
 	t.M.Lock()
-	errMapClone := make([]shared.TError, 0)
+	errorsClone := make([]shared.TError, 0)
 	for _, v := range t.errors {
-		errMapClone = append(errMapClone, v)
+		errorsClone = append(errorsClone, v)
 	}
 	t.errors = make([]shared.TError, 0)
 	t.errMap = make(map[string]struct{})
 	t.M.Unlock()
 
-	for i := range errMapClone {
-		wss.DataPoint.Errors = append(wss.DataPoint.Errors, errMapClone[i])
+	for i := range errorsClone {
+		wss.DataPoint.Errors = append(wss.DataPoint.Errors, errorsClone[i])
 		if t.Config.Save {
-			fileb, err := json.Marshal(errMapClone[i])
+			fileb, err := json.Marshal(errorsClone[i])
 			if err != nil {
 				t.AddError(err, "error-marshaling")
 			}
@@ -600,10 +611,14 @@ func generateDataPoints(t *test) {
 			continue
 		}
 
+		if !rv.hasStats {
+			continue
+		}
+
 		r := t.Readers[ri]
+
 		tx := r.TX.Swap(0)
-		prevTime := time.Since(r.lastDataPointTime).Microseconds()
-		totalSecs := float64(prevTime) / 1000000
+		totalSecs := time.Since(r.lastDataPointTime).Seconds()
 		r.lastDataPointTime = time.Now()
 		txtotal := float64(tx) / totalSecs
 
@@ -612,8 +627,8 @@ func generateDataPoints(t *test) {
 			TestID:            t.ID,
 			Created:           time.Now(),
 			TX:                uint64(txtotal),
+			TXTotal:           tx,
 			TXCount:           r.TXCount.Load(),
-			Local:             bindAddress,
 			Remote:            r.addr,
 			TTFBL:             r.TTFBL,
 			TTFBH:             r.TTFBH,
@@ -625,11 +640,18 @@ func generateDataPoints(t *test) {
 			CPUUsedPercent:    int(cpuPercent),
 		}
 
+		if realIP != "" {
+			d.Local = realIP
+		} else {
+			d.Local = bindAddress
+		}
+
 		r.m.Lock()
+		r.hasStats = false
 		r.TTFBH = 0
-		r.TTFBL = 99999999
+		r.TTFBL = math.MaxInt64
 		r.RMSH = 0
-		r.RMSL = 99999999
+		r.RMSL = math.MaxInt64
 		r.m.Unlock()
 
 		t.DPS = append(t.DPS, d)
@@ -669,7 +691,8 @@ func newPerformanceReaderForASingleHost(c *shared.Config, host string, port stri
 	r.addr = net.JoinHostPort(host, port)
 	r.ip = host
 	r.buf = make([]byte, c.PayloadSize)
-	r.TTFBL = 99999999
+	r.TTFBL = math.MaxInt64
+	r.RMSL = math.MaxInt64
 	r.client = &http.Client{
 		Transport: newTransport(c),
 	}
@@ -749,6 +772,10 @@ func sendRequestToHost(t *test, r *netPerfReader, cid int) {
 		proto+r.addr+route,
 		body,
 	)
+	if err != nil {
+		t.AddError(err, "network-new-request")
+		return
+	}
 
 	if t.Config.TestType == shared.BandwidthTest {
 		req.ContentLength = -1
@@ -780,6 +807,7 @@ func sendRequestToHost(t *test, r *netPerfReader, cid int) {
 	if done < r.RMSL {
 		r.RMSL = done
 	}
+	r.hasStats = true
 	r.m.Unlock()
 
 	io.Copy(io.Discard, resp.Body)
