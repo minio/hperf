@@ -21,12 +21,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"os"
+	"reflect"
 	"runtime/debug"
 	"slices"
 	"strconv"
@@ -661,4 +663,66 @@ func updateBracketStats(b []int64, dp shared.DP) {
 	if dp.RMSH > b[4] {
 		b[4] = dp.RMSH
 	}
+}
+
+func MakeCSV(ctx context.Context, c shared.Config) (err error) {
+	byteValue, err := os.ReadFile(c.File)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.Create(c.File + ".csv")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	fb := bytes.NewBuffer(byteValue)
+	scanner := bufio.NewScanner(fb)
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+	if err := writer.Write(getStructFields(new(shared.DP))); err != nil {
+		return err
+	}
+
+	for scanner.Scan() {
+		b := scanner.Bytes()
+		if bytes.Contains(b, []byte("Error")) {
+			continue
+		}
+		dp := new(shared.DP)
+		err = json.Unmarshal(b, dp)
+		if err != nil {
+			return err
+		}
+
+		if err := writer.Write(dpToSlice(dp)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// Function to get field names of the struct
+func getStructFields(s interface{}) []string {
+	t := reflect.TypeOf(s).Elem()
+	fields := make([]string, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		fields[i] = t.Field(i).Tag.Get("json")
+		if fields[i] == "" {
+			fields[i] = t.Field(i).Name
+		}
+	}
+	return fields
+}
+
+func dpToSlice(dp *shared.DP) (data []string) {
+	v := reflect.ValueOf(dp).Elem()
+	data = make([]string, v.NumField())
+	for i := 0; i < v.NumField(); i++ {
+		data[i] = fmt.Sprintf("%v", v.Field(i).Interface())
+	}
+	return
 }

@@ -169,6 +169,7 @@ var (
 	Commands = []cli.Command{
 		analyzeCMD,
 		bandwidthCMD,
+		csvCMD,
 		deleteCMD,
 		latencyCMD,
 		listenCMD,
