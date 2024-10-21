@@ -37,7 +37,12 @@ var (
 		Value:  "0.0.0.0:9010",
 		Usage:  "bind to the specified address",
 	}
-
+	realIPFlag = cli.StringFlag{
+		Name:   "real-ip",
+		EnvVar: "HPERF_REAL_IP",
+		Value:  "",
+		Usage:  "The real IP used to connect to other servers. If the --address is bound to the real IP then this flag can be skipped.",
+	}
 	storagePathFlag = cli.StringFlag{
 		Name:   "storage-path",
 		EnvVar: "HPERF_STORAGE_PATH",
@@ -49,7 +54,7 @@ var (
 		Name:   "server",
 		Usage:  "start an interactive server",
 		Action: runServer,
-		Flags:  []cli.Flag{addressFlag, storagePathFlag, debugFlag},
+		Flags:  []cli.Flag{addressFlag, realIPFlag, storagePathFlag, debugFlag},
 		CustomHelpTemplate: `NAME:
   {{.HelpName}} - {{.Usage}}
 
@@ -68,11 +73,19 @@ EXAMPLES:
 
   3. Run HPerf server with custom file path and custom address
     {{.Prompt}} {{.HelpName}} --storage-path /path/on/disk --address 0.0.0.0:9000
+
+  4. Run HPerf server with custom file path and floating(real) ip
+    {{.Prompt}} {{.HelpName}} --storage-path /path/on/disk --address 0.0.0.0:9000 --real-ip 152.121.12.4
 `,
 	}
 )
 
 func runServer(ctx *cli.Context) error {
 	shared.DebugEnabled = debug
-	return server.RunServer(GlobalContext, ctx.String("address"), ctx.String("storage-path"))
+	return server.RunServer(
+		GlobalContext,
+		ctx.String("address"),
+		ctx.String("real-ip"),
+		ctx.String("storage-path"),
+	)
 }

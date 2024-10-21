@@ -22,17 +22,16 @@ import (
 	"github.com/minio/hperf/client"
 )
 
-var analyzeCMD = cli.Command{
-	Name:   "analyze",
-	Usage:  "Analyze the give test",
-	Action: runAnalyze,
+var statDownloadCMD = cli.Command{
+	Name:   "download",
+	Usage:  "Download stats for tests by ID",
+	Action: runDownload,
 	Flags: []cli.Flag{
 		dnsServerFlag,
 		hostsFlag,
 		portFlag,
+		testIDFlag,
 		fileFlag,
-		printStatsFlag,
-		printErrFlag,
 	},
 	CustomHelpTemplate: `NAME:
   {{.HelpName}} - {{.Usage}}
@@ -44,17 +43,16 @@ FLAGS:
   {{range .VisibleFlags}}{{.}}
   {{end}}
 EXAMPLES:
-  1. Analyze test results in file '/tmp/latency-test-1':
-    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1 --file latency-test-1
-  1. Analyze test results and print full output:
-    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1 --file latency-test-1 --print-full
+  1. Download test by ID for hosts '10.10.10.1' and '10.10.10.2':
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --id my_test_id --file /tmp/output-file
 `,
 }
 
-func runAnalyze(ctx *cli.Context) error {
+func runDownload(ctx *cli.Context) error {
 	config, err := parseConfig(ctx)
 	if err != nil {
 		return err
 	}
-	return client.AnalyzeTest(GlobalContext, *config)
+
+	return client.DownloadTest(GlobalContext, *config)
 }
