@@ -528,6 +528,7 @@ func DownloadTest(ctx context.Context, c shared.Config) (err error) {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	for i := range responseDPS {
 		_, err := shared.WriteStructAndNewLineToFile(f, responseDPS[i])
 		if err != nil {
