@@ -553,6 +553,7 @@ func AnalyzeTest(ctx context.Context, c shared.Config) (err error) {
 	if err != nil {
 		return err
 	}
+	defer f.Close()	
 
 	dps := make([]shared.DP, 0)
 	errors := make([]shared.TError, 0)
