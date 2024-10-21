@@ -3,7 +3,7 @@
 hperf is a tool for active measurements of the maximum achievable bandwidth between N peers, measuring RX/TX bandwidth for each peers.
 
 ## What is hperf for
-Hperf was made to test networks in large infrastructure. It's highly scalable and cabaple of running parallel tests over a long period of time. 
+Hperf was made to test networks in large infrastructure. It's highly scalable and capable of running parallel tests over a long period of time. 
 
 ## Common use cases
 - Debugging link/nic MTU issues
