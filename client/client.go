@@ -246,22 +246,24 @@ func receiveJSONDataPoint(data []byte, _ *shared.Config) {
 	responseLock.Lock()
 	defer responseLock.Unlock()
 
-	if bytes.Contains(data, []byte("Error")) {
+	if bytes.HasPrefix(data, shared.ErrorPoint.String()) {
 		dp := new(shared.TError)
-		err := json.Unmarshal(data, &dp)
+		err := json.Unmarshal(data[1:], &dp)
 		if err != nil {
 			PrintError(err)
 			return
 		}
 		responseERR = append(responseERR, *dp)
-	} else {
+	} else if bytes.HasPrefix(data, shared.DataPoint.String()) {
 		dp := new(shared.DP)
-		err := json.Unmarshal(data, &dp)
+		err := json.Unmarshal(data[1:], &dp)
 		if err != nil {
 			PrintError(err)
 			return
 		}
 		responseDPS = append(responseDPS, *dp)
+	} else {
+		PrintError(fmt.Errorf("Uknown data point: %s", data))
 	}
 }
 
@@ -530,13 +532,13 @@ func DownloadTest(ctx context.Context, c shared.Config) (err error) {
 	}
 	defer f.Close()
 	for i := range responseDPS {
-		_, err := shared.WriteStructAndNewLineToFile(f, responseDPS[i])
+		_, err := shared.WriteStructAndNewLineToFile(f, shared.DataPoint, responseDPS[i])
 		if err != nil {
 			return err
 		}
 	}
 	for i := range responseERR {
-		_, err := shared.WriteStructAndNewLineToFile(f, responseERR[i])
+		_, err := shared.WriteStructAndNewLineToFile(f, shared.ErrorPoint, responseERR[i])
 		if err != nil {
 			return err
 		}
@@ -553,7 +555,7 @@ func AnalyzeTest(ctx context.Context, c shared.Config) (err error) {
 	if err != nil {
 		return err
 	}
-	defer f.Close()	
+	defer f.Close()
 
 	dps := make([]shared.DP, 0)
 	errors := make([]shared.TError, 0)
@@ -561,21 +563,24 @@ func AnalyzeTest(ctx context.Context, c shared.Config) (err error) {
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		b := s.Bytes()
-		if !bytes.Contains(b, []byte("Error")) {
-			dp := new(shared.DP)
-			err := json.Unmarshal(b, dp)
-			if err != nil {
-				return err
-			}
-			dps = append(dps, *dp)
-		} else {
+		if bytes.HasPrefix(b[1:], shared.ErrorPoint.String()) {
 			dperr := new(shared.TError)
 			err := json.Unmarshal(b, dperr)
 			if err != nil {
 				return err
 			}
 			errors = append(errors, *dperr)
+		} else if bytes.HasPrefix(b, shared.DataPoint.String()) {
+			dp := new(shared.DP)
+			err := json.Unmarshal(b[1:], dp)
+			if err != nil {
+				return err
+			}
+			dps = append(dps, *dp)
+		} else {
+			shared.DEBUG(ErrorStyle.Render("Unknown data point encountered: ", string(b)))
 		}
+
 	}
 
 	if c.PrintFull {
@@ -690,17 +695,16 @@ func MakeCSV(ctx context.Context, c shared.Config) (err error) {
 
 	for scanner.Scan() {
 		b := scanner.Bytes()
-		if bytes.Contains(b, []byte("Error")) {
-			continue
-		}
-		dp := new(shared.DP)
-		err = json.Unmarshal(b, dp)
-		if err != nil {
-			return err
-		}
+		if bytes.HasPrefix(b, shared.DataPoint.String()) {
+			dp := new(shared.DP)
+			err = json.Unmarshal(b[1:], dp)
+			if err != nil {
+				return err
+			}
 
-		if err := writer.Write(dpToSlice(dp)); err != nil {
-			return err
+			if err := writer.Write(dpToSlice(dp)); err != nil {
+				return err
+			}
 		}
 	}
 

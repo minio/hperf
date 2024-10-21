@@ -562,7 +562,9 @@ func sendAndSaveData(t *test) (err error) {
 			if err != nil {
 				t.AddError(err, "datapoint-marshaling")
 			}
-			t.DataFile.Write(append(fileb, []byte{10}...))
+			t.DataFile.Write(shared.DataPoint.String())
+			t.DataFile.Write(fileb)
+			t.DataFile.Write([]byte{10})
 		}
 	}
 	t.DPS = make([]shared.DP, 0)
@@ -583,7 +585,9 @@ func sendAndSaveData(t *test) (err error) {
 			if err != nil {
 				t.AddError(err, "error-marshaling")
 			}
-			t.DataFile.Write(append(fileb, []byte{10}...))
+			t.DataFile.Write(shared.ErrorPoint.String())
+			t.DataFile.Write(fileb)
+			t.DataFile.Write([]byte{10})
 		}
 	}
 

@@ -71,7 +71,17 @@ type (
 	SignalType int
 	SignalCode int
 	TestType   int
+	FilePrefix byte
 )
+
+const (
+	DataPoint FilePrefix = iota
+	ErrorPoint
+)
+
+func (f FilePrefix) String() []byte {
+	return []byte(strconv.Itoa(int(f)))
+}
 
 const (
 	Err SignalType = iota
@@ -306,11 +316,19 @@ func GetInterfaceAddresses() (list []string, err error) {
 	return
 }
 
-func WriteStructAndNewLineToFile(f *os.File, s interface{}) (int, error) {
+func WriteStructAndNewLineToFile(f *os.File, prefix FilePrefix, s interface{}) (int, error) {
 	outb, err := json.Marshal(s)
 	if err != nil {
 		return 0, err
 	}
-	n, err := f.Write(append(outb, []byte{10}...))
+	n, err := f.Write(prefix.String())
+	if err != nil {
+		return n, err
+	}
+	n, err = f.Write(outb)
+	if err != nil {
+		return n, err
+	}
+	n, err = f.Write([]byte{10})
 	return n, err
 }
