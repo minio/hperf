@@ -37,7 +37,7 @@ type column struct {
 	width int
 }
 
-var headerSlice = make([]header, 23)
+var headerSlice = make([]header, header_length)
 
 type HeaderField int
 
@@ -65,6 +65,7 @@ const (
 	CPULow
 	ID
 	HumanTime
+	header_length
 )
 
 func initHeaders() {
