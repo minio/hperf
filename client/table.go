@@ -73,23 +73,23 @@ func initHeaders() {
 	headerSlice[Created] = header{"Created", 8}
 	headerSlice[Local] = header{"Local", 15}
 	headerSlice[Remote] = header{"Remote", 15}
-	headerSlice[RMSH] = header{"RMSH", 8}
-	headerSlice[RMSL] = header{"RMSL", 8}
-	headerSlice[TTFBH] = header{"TTFBH", 8}
-	headerSlice[TTFBL] = header{"TTFBL", 8}
+	headerSlice[RMSH] = header{"RMS(high)", 9}
+	headerSlice[RMSL] = header{"RMS(low)", 9}
+	headerSlice[TTFBH] = header{"TTFB(high)", 9}
+	headerSlice[TTFBL] = header{"TTFB(low)", 9}
 	headerSlice[TX] = header{"TX", 10}
-	headerSlice[TXL] = header{"TXLow", 10}
-	headerSlice[TXH] = header{"TXHigh", 10}
-	headerSlice[TXT] = header{"TXTotal", 15}
+	headerSlice[TXL] = header{"TX(low)", 10}
+	headerSlice[TXH] = header{"TX(high)", 10}
+	headerSlice[TXT] = header{"TX(total)", 15}
 	headerSlice[TXCount] = header{"#TX", 10}
 	headerSlice[ErrCount] = header{"#ERR", 6}
 	headerSlice[DroppedPackets] = header{"#Dropped", 9}
-	headerSlice[MemoryUsage] = header{"MemUsed", 7}
-	headerSlice[MemoryHigh] = header{"MemHigh", 7}
-	headerSlice[MemoryLow] = header{"MemLow", 7}
-	headerSlice[CPUUsage] = header{"CPUUsed", 7}
-	headerSlice[CPUHigh] = header{"CPUHigh", 7}
-	headerSlice[CPULow] = header{"CPULow", 7}
+	headerSlice[MemoryUsage] = header{"Mem(used)", 9}
+	headerSlice[MemoryHigh] = header{"Mem(high)", 9}
+	headerSlice[MemoryLow] = header{"Mem(low)", 9}
+	headerSlice[CPUUsage] = header{"CPU(used)", 9}
+	headerSlice[CPUHigh] = header{"CPU(high)", 9}
+	headerSlice[CPULow] = header{"CPU(low)", 9}
 	headerSlice[ID] = header{"ID", 30}
 	headerSlice[HumanTime] = header{"Time", 30}
 }
@@ -191,6 +191,7 @@ func printRealTimeRow(style lipgloss.Style, entry *shared.TestOutput, t shared.T
 		PrintColumns(
 			style,
 			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
+			column{formatUint(entry.TXC), headerSlice[TXCount].width},
 			column{formatUint(entry.TXH), headerSlice[TXH].width},
 			column{formatUint(entry.TXL), headerSlice[TXL].width},
 			column{formatUint(entry.TXT), headerSlice[TXT].width},
