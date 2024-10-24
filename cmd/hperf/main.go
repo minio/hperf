@@ -155,9 +155,21 @@ var (
 		Name:  "print-stats",
 		Usage: "Print stat points",
 	}
+	microSecondsFlag = cli.BoolFlag{
+		Name:  "micro",
+		Usage: "Display timers in microseconds instead of milliseconds",
+	}
+	sortFlag = cli.StringFlag{
+		Name:  "sort",
+		Usage: "Sort datapoints using columns",
+	}
 	printErrFlag = cli.BoolFlag{
 		Name:  "print-errors",
 		Usage: "Print errors",
+	}
+	hostFilterFlag = cli.StringFlag{
+		Name:  "host-filter",
+		Usage: "Filter analysis datapoints based on host",
 	}
 )
 
@@ -174,7 +186,6 @@ var (
 		latencyCMD,
 		listenCMD,
 		listTestsCMD,
-		requestsCMD,
 		serverCMD,
 		statDownloadCMD,
 		stopCMD,
@@ -256,6 +267,9 @@ func parseConfig(ctx *cli.Context) (*shared.Config, error) {
 		File:           ctx.String(fileFlag.Name),
 		PrintFull:      ctx.Bool(printStatsFlag.Name),
 		PrintErrors:    ctx.Bool(printErrFlag.Name),
+		Sort:           shared.SortType(ctx.String(sortFlag.Name)),
+		Micro:          ctx.Bool(microSecondsFlag.Name),
+		HostFilter:     ctx.String(hostFilterFlag.Name),
 	}
 
 	switch ctx.Command.Name {

@@ -39,6 +39,7 @@ var latencyCMD = cli.Command{
 		testIDFlag,
 		saveTestFlag,
 		dnsServerFlag,
+		microSecondsFlag,
 	},
 	CustomHelpTemplate: `NAME:
   {{.HelpName}} - {{.Usage}}

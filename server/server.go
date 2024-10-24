@@ -216,17 +216,13 @@ func startAPIandWS(ctx context.Context) (err error) {
 		}
 	}))
 
-	httpServer.Get("/latency", func(c *fiber.Ctx) error {
+	httpServer.Put("/latency", func(c *fiber.Ctx) error {
+		io.Copy(io.Discard, bytes.NewBuffer(c.Body()))
 		return c.SendStatus(200)
 	})
 
 	httpServer.Put("/bandwidth", func(c *fiber.Ctx) error {
 		io.Copy(io.Discard, c.Request().BodyStream())
-		return c.SendStatus(200)
-	})
-
-	httpServer.Put("/http", func(c *fiber.Ctx) error {
-		io.Copy(io.Discard, bytes.NewBuffer(c.Body()))
 		return c.SendStatus(200)
 	})
 
@@ -692,6 +688,7 @@ type dialContext func(ctx context.Context, network, address string) (net.Conn, e
 
 func newPerformanceReaderForASingleHost(c *shared.Config, host string, port string) (r *netPerfReader) {
 	r = new(netPerfReader)
+	r.lastDataPointTime = time.Now()
 	r.addr = net.JoinHostPort(host, port)
 	r.ip = host
 	r.buf = make([]byte, c.PayloadSize)
@@ -755,16 +752,13 @@ func sendRequestToHost(t *test, r *netPerfReader, cid int) {
 	var body io.Reader
 	method := http.MethodGet
 	switch t.Config.TestType {
-	case shared.LatencyTest:
-		route = "/latency"
-		method = http.MethodGet
 	case shared.BandwidthTest:
 		route = "/bandwidth"
 		body = io.NopCloser(AR)
 		method = http.MethodPut
-	case shared.HTTPTest:
+	case shared.LatencyTest:
 		method = http.MethodPut
-		route = "/http"
+		route = "/latency"
 		body = AR
 	default:
 		t.AddError(fmt.Errorf("Unknown test type: %d", t.Config.TestType), "unknown-signal")
