@@ -104,13 +104,11 @@ func GenerateFormatString(columnCount int) (fs string) {
 var (
 	ListHeaders          = []HeaderField{IntNumber, ID, HumanTime}
 	BandwidthHeaders     = []HeaderField{Created, Local, Remote, TX, ErrCount, DroppedPackets, MemoryUsage, CPUUsage}
-	LatencyHeaders       = []HeaderField{Created, Local, Remote, RMSH, RMSL, TXCount, ErrCount, DroppedPackets, MemoryUsage, CPUUsage}
-	HTTPHeaders          = []HeaderField{Created, Local, Remote, RMSH, RMSL, TTFBH, TTFBL, TX, TXCount, ErrCount, DroppedPackets, MemoryUsage, CPUUsage}
+	LatencyHeaders       = []HeaderField{Created, Local, Remote, RMSH, RMSL, TTFBH, TTFBL, TX, TXCount, ErrCount, DroppedPackets, MemoryUsage, CPUUsage}
 	FullDataPointHeaders = []HeaderField{Created, Local, Remote, RMSH, RMSL, TTFBH, TTFBL, TX, TXCount, ErrCount, DroppedPackets, MemoryUsage, CPUUsage}
 
-	RealTimeLatencyHeaders   = []HeaderField{ErrCount, TXCount, RMSH, RMSL, DroppedPackets, MemoryHigh, MemoryLow, CPUHigh, CPULow}
 	RealTimeBandwidthHeaders = []HeaderField{ErrCount, TXCount, TXH, TXL, TXT, DroppedPackets, MemoryHigh, MemoryLow, CPUHigh, CPULow}
-	RealTimeHTTPHeaders      = []HeaderField{ErrCount, TXCount, TXH, TXL, TXT, RMSH, RMSL, TTFBH, TTFBL, DroppedPackets, MemoryHigh, MemoryLow, CPUHigh, CPULow}
+	RealTimeLatencyHeaders   = []HeaderField{ErrCount, TXCount, TXH, TXL, TXT, RMSH, RMSL, TTFBH, TTFBL, DroppedPackets, MemoryHigh, MemoryLow, CPUHigh, CPULow}
 )
 
 var (
@@ -135,6 +133,51 @@ func printHeader(fields []HeaderField) {
 	fmt.Println(HeaderStyle.Render(fmt.Sprintf(fs, hs...)))
 }
 
+func PrintPercentilesHeader(style lipgloss.Style, tag string, dps []int64, c shared.Config) {
+	fs := GenerateFormatString(6)
+	hs := []interface{}{
+		4, tag,
+		10, "count",
+		10, "sum",
+		10, "min",
+		10, "avg",
+		10, "max",
+	}
+	fmt.Println(style.Render(
+		fmt.Sprintf(fs, hs...),
+	))
+}
+
+func PrintPercentiles(style lipgloss.Style, tag string, dps []int64, c shared.Config) {
+	PrintPercentilesHeader(style, tag, dps, c)
+	fs := GenerateFormatString(6)
+	hs := make([]interface{}, 12)
+	hs[0] = 4
+	hs[1] = ""
+	hs[2] = 10
+	hs[3] = formatInt(dps[0])
+	hs[4] = 10
+	hs[6] = 10
+	hs[8] = 10
+	hs[10] = 10
+
+	if c.Micro {
+		hs[5] = formatInt(dps[1])
+		hs[7] = formatInt(dps[2])
+		hs[9] = formatInt(dps[3])
+		hs[11] = formatInt(dps[4])
+	} else {
+		hs[5] = formatInt(dps[1] / 1000)
+		hs[7] = formatInt(dps[2] / 1000)
+		hs[9] = formatInt(dps[3] / 1000)
+		hs[11] = formatInt(dps[4] / 1000)
+	}
+
+	fmt.Println(BaseStyle.Render(
+		fmt.Sprintf(fs, hs...),
+	))
+}
+
 func PrintColumns(style lipgloss.Style, columns ...column) {
 	fs := GenerateFormatString(len(columns))
 	hs := make([]interface{}, 0)
@@ -152,8 +195,6 @@ func printDataPointHeaders(t shared.TestType) {
 		printHeader(BandwidthHeaders)
 	case shared.LatencyTest:
 		printHeader(LatencyHeaders)
-	case shared.HTTPTest:
-		printHeader(HTTPHeaders)
 	default:
 		printHeader(FullDataPointHeaders)
 	}
@@ -165,36 +206,20 @@ func printRealTimeHeaders(t shared.TestType) {
 		printHeader(RealTimeBandwidthHeaders)
 	case shared.LatencyTest:
 		printHeader(RealTimeLatencyHeaders)
-	case shared.HTTPTest:
-		printHeader(RealTimeHTTPHeaders)
 	default:
 	}
 }
 
 func printRealTimeRow(style lipgloss.Style, entry *shared.TestOutput, t shared.TestType) {
 	switch t {
-	case shared.LatencyTest:
-		PrintColumns(
-			style,
-			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
-			column{formatUint(entry.TXC), headerSlice[TXCount].width},
-			column{formatInt(entry.RMSH), headerSlice[RMSH].width},
-			column{formatInt(entry.RMSL), headerSlice[RMSL].width},
-			column{formatInt(int64(entry.DP)), headerSlice[DroppedPackets].width},
-			column{formatInt(int64(entry.MH)), headerSlice[MemoryHigh].width},
-			column{formatInt(int64(entry.ML)), headerSlice[MemoryLow].width},
-			column{formatInt(int64(entry.CH)), headerSlice[CPUHigh].width},
-			column{formatInt(int64(entry.CL)), headerSlice[CPULow].width},
-		)
-		return
 	case shared.BandwidthTest:
 		PrintColumns(
 			style,
 			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
 			column{formatUint(entry.TXC), headerSlice[TXCount].width},
-			column{formatUint(entry.TXH), headerSlice[TXH].width},
-			column{formatUint(entry.TXL), headerSlice[TXL].width},
-			column{formatUint(entry.TXT), headerSlice[TXT].width},
+			column{shared.BWToString(entry.TXH), headerSlice[TXH].width},
+			column{shared.BWToString(entry.TXL), headerSlice[TXL].width},
+			column{shared.BToString(entry.TXT), headerSlice[TXT].width},
 			column{formatInt(int64(entry.DP)), headerSlice[DroppedPackets].width},
 			column{formatInt(int64(entry.MH)), headerSlice[MemoryHigh].width},
 			column{formatInt(int64(entry.ML)), headerSlice[MemoryLow].width},
@@ -202,14 +227,14 @@ func printRealTimeRow(style lipgloss.Style, entry *shared.TestOutput, t shared.T
 			column{formatInt(int64(entry.CL)), headerSlice[CPULow].width},
 		)
 		return
-	case shared.HTTPTest:
+	case shared.LatencyTest:
 		PrintColumns(
 			style,
 			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
 			column{formatUint(entry.TXC), headerSlice[TXCount].width},
-			column{formatUint(entry.TXH), headerSlice[TXH].width},
-			column{formatUint(entry.TXL), headerSlice[TXL].width},
-			column{formatUint(entry.TXT), headerSlice[TXT].width},
+			column{shared.BWToString(entry.TXH), headerSlice[TXH].width},
+			column{shared.BWToString(entry.TXL), headerSlice[TXL].width},
+			column{shared.BToString(entry.TXT), headerSlice[TXT].width},
 			column{formatInt(entry.RMSH), headerSlice[RMSH].width},
 			column{formatInt(entry.RMSL), headerSlice[RMSL].width},
 			column{formatInt(entry.TTFBH), headerSlice[TTFBH].width},
@@ -227,35 +252,20 @@ func printRealTimeRow(style lipgloss.Style, entry *shared.TestOutput, t shared.T
 
 func printTableRow(style lipgloss.Style, entry *shared.DP, t shared.TestType) {
 	switch t {
-	case shared.LatencyTest:
-		PrintColumns(
-			style,
-			column{entry.Created.Format("15:04:05"), headerSlice[Created].width},
-			column{strings.Split(entry.Local, ":")[0], headerSlice[Local].width},
-			column{strings.Split(entry.Remote, ":")[0], headerSlice[Remote].width},
-			column{formatInt(entry.RMSH), headerSlice[RMSH].width},
-			column{formatInt(entry.RMSL), headerSlice[RMSL].width},
-			column{formatUint(entry.TXCount), headerSlice[TXCount].width},
-			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
-			column{formatInt(int64(entry.DroppedPackets)), headerSlice[DroppedPackets].width},
-			column{formatInt(int64(entry.MemoryUsedPercent)), headerSlice[MemoryUsage].width},
-			column{formatInt(int64(entry.CPUUsedPercent)), headerSlice[MemoryUsage].width},
-		)
-		return
 	case shared.BandwidthTest:
 		PrintColumns(
 			style,
 			column{entry.Created.Format("15:04:05"), headerSlice[Created].width},
 			column{strings.Split(entry.Local, ":")[0], headerSlice[Local].width},
 			column{strings.Split(entry.Remote, ":")[0], headerSlice[Remote].width},
-			column{shared.BandwidthBytesToString(entry.TX), headerSlice[TX].width},
+			column{shared.BWToString(entry.TX), headerSlice[TX].width},
 			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
 			column{formatInt(int64(entry.DroppedPackets)), headerSlice[DroppedPackets].width},
 			column{formatInt(int64(entry.MemoryUsedPercent)), headerSlice[MemoryUsage].width},
 			column{formatInt(int64(entry.CPUUsedPercent)), headerSlice[CPUUsage].width},
 		)
 		return
-	case shared.HTTPTest:
+	case shared.LatencyTest:
 		PrintColumns(
 			style,
 			column{entry.Created.Format("15:04:05"), headerSlice[Created].width},
@@ -265,7 +275,7 @@ func printTableRow(style lipgloss.Style, entry *shared.DP, t shared.TestType) {
 			column{formatInt(entry.RMSL), headerSlice[RMSL].width},
 			column{formatInt(entry.TTFBH), headerSlice[TTFBH].width},
 			column{formatInt(entry.TTFBL), headerSlice[TTFBH].width},
-			column{shared.BandwidthBytesToString(entry.TX), headerSlice[TX].width},
+			column{shared.BWToString(entry.TX), headerSlice[TX].width},
 			column{formatUint(entry.TXCount), headerSlice[TXCount].width},
 			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
 			column{formatInt(int64(entry.DroppedPackets)), headerSlice[DroppedPackets].width},
@@ -297,8 +307,6 @@ func praseDataPoint(r *shared.DataReponseToClient, c *shared.Config) {
 	responseLock.Lock()
 	defer responseLock.Unlock()
 
-	s1 := lipgloss.NewStyle()
-
 	// This guarantees we are always printing the
 	// same header types as the data point types.
 	if len(r.DPS) > 0 {
@@ -317,10 +325,7 @@ func praseDataPoint(r *shared.DataReponseToClient, c *shared.Config) {
 	for i := range r.DPS {
 		r.DPS[i].Received = time.Now()
 		entry := r.DPS[i]
-		sp1 := strings.Split(entry.Local, ":")
-		sp2 := strings.Split(sp1[0], ".")
-		s1 = s1.Background(lipgloss.Color(getHex(sp2[len(sp2)-1])))
-		printTableRow(s1, &entry, entry.Type)
+		printTableRow(BaseStyle, &entry, entry.Type)
 	}
 
 	for i := range r.Errors {
@@ -338,36 +343,4 @@ func formatInt(val int64) string {
 
 func formatUint(val uint64) string {
 	return strconv.FormatUint(val, 10)
-}
-
-var baseStyle = lipgloss.NewStyle().
-	BorderStyle(lipgloss.NormalBorder()).
-	BorderForeground(lipgloss.Color("240"))
-
-func getHex(firstOcted string) (hex string) {
-	of, err := strconv.ParseFloat(firstOcted, 64)
-	if err != nil {
-		return COLORS[0]
-	}
-	index := (of / 25) * 10
-	if index > 10 {
-		index = 10
-	} else if index < 0 {
-		index = 0
-	}
-	return COLORS[int(index)]
-}
-
-var COLORS = []string{
-	"#00000E",
-	"#00001E",
-	"#00002E",
-	"#00003E",
-	"#00004E",
-	"#00005E",
-	"#00006E",
-	"#00007E",
-	"#00008E",
-	"#00009E",
-	"#0000AE",
 }

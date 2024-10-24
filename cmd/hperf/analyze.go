@@ -33,6 +33,9 @@ var analyzeCMD = cli.Command{
 		fileFlag,
 		printStatsFlag,
 		printErrFlag,
+		sortFlag,
+		microSecondsFlag,
+		hostFilterFlag,
 	},
 	CustomHelpTemplate: `NAME:
   {{.HelpName}} - {{.Usage}}
@@ -46,8 +49,12 @@ FLAGS:
 EXAMPLES:
   1. Analyze test results in file '/tmp/latency-test-1':
     {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1 --file latency-test-1
-  1. Analyze test results and print full output:
+  2. Analyze test results and print full output:
     {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1 --file latency-test-1 --print-full
+  3. Analyze test results with sorted output:
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1 --file latency-test-1 --sort RMSH
+  4. Analyze test results with sorted output:
+    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1 --file latency-test-1 --sort RMSH --host-filter 10.10.10.1
 `,
 }
 

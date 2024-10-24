@@ -102,7 +102,7 @@ const (
 	Unknown TestType = iota
 	LatencyTest
 	BandwidthTest
-	HTTPTest
+	// HTTPTest
 )
 
 const (
@@ -110,27 +110,6 @@ const (
 	Fail
 	Retry
 )
-
-func BandwidthBytesToString(b uint64) string {
-	if b <= 999 {
-		intS := strconv.FormatUint(b, 10)
-		return intS + " B/s"
-	} else if b <= 999_999 {
-		intF := float64(b)
-		return fmt.Sprintf("%.2f KB/s", intF/1000)
-	} else if b <= 999_999_999 {
-		intF := float64(b)
-		return fmt.Sprintf("%.2f MB/s", intF/1_000_000)
-	} else if b <= 999_999_999_999 {
-		intF := float64(b)
-		return fmt.Sprintf("%.2f GB/s", intF/1_000_000_000)
-	} else if b <= 999_999_999_999_999 {
-		intF := float64(b)
-		return fmt.Sprintf("%.2f TB/s", intF/1_000_000_000_000)
-	}
-
-	return "???"
-}
 
 type TError struct {
 	Error   string
@@ -184,9 +163,12 @@ type Config struct {
 	// AllowLocalInterface bool          `json:"AllowLocalInterfaces"`
 
 	// Client Only
-	ResolveHosts string `json:"-"`
-	PrintFull    bool   `json:"-"`
-	PrintErrors  bool   `json:"-"`
+	ResolveHosts string   `json:"-"`
+	PrintFull    bool     `json:"-"`
+	PrintErrors  bool     `json:"-"`
+	Sort         SortType `json:"-"`
+	Micro        bool     `json:"-"`
+	HostFilter   string   `json:"-"`
 }
 
 func INFO(items ...any) {
@@ -197,6 +179,48 @@ func DEBUG(items ...any) {
 	if DebugEnabled {
 		fmt.Println(items...)
 	}
+}
+
+func BToString(b uint64) string {
+	if b <= 999 {
+		intS := strconv.FormatUint(b, 10)
+		return intS + " B"
+	} else if b <= 999_999 {
+		intF := float64(b)
+		return fmt.Sprintf("%.2f KB", intF/1000)
+	} else if b <= 999_999_999 {
+		intF := float64(b)
+		return fmt.Sprintf("%.2f MB", intF/1_000_000)
+	} else if b <= 999_999_999_999 {
+		intF := float64(b)
+		return fmt.Sprintf("%.2f GB", intF/1_000_000_000)
+	} else if b <= 999_999_999_999_999 {
+		intF := float64(b)
+		return fmt.Sprintf("%.2f TB", intF/1_000_000_000_000)
+	}
+
+	return "???"
+}
+
+func BWToString(b uint64) string {
+	if b <= 999 {
+		intS := strconv.FormatUint(b, 10)
+		return intS + " B/s"
+	} else if b <= 999_999 {
+		intF := float64(b)
+		return fmt.Sprintf("%.2f KB/s", intF/1000)
+	} else if b <= 999_999_999 {
+		intF := float64(b)
+		return fmt.Sprintf("%.2f MB/s", intF/1_000_000)
+	} else if b <= 999_999_999_999 {
+		intF := float64(b)
+		return fmt.Sprintf("%.2f GB/s", intF/1_000_000_000)
+	} else if b <= 999_999_999_999_999 {
+		intF := float64(b)
+		return fmt.Sprintf("%.2f TB/s", intF/1_000_000_000_000)
+	}
+
+	return "???"
 }
 
 func ParseHosts(hosts string, dnsServer string) (list []string, err error) {

@@ -32,7 +32,6 @@ import (
 	"runtime/debug"
 	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -399,6 +398,13 @@ func RunTest(ctx context.Context, c shared.Config) (err error) {
 			}
 		}
 
+		if !c.Micro {
+			to.TTFBH = to.TTFBH / 1000
+			to.TTFBL = to.TTFBL / 1000
+			to.RMSH = to.RMSH / 1000
+			to.RMSL = to.RMSL / 1000
+		}
+
 		for i := range responseERR {
 			fmt.Println(responseERR[i])
 		}
@@ -580,96 +586,103 @@ func AnalyzeTest(ctx context.Context, c shared.Config) (err error) {
 		} else {
 			shared.DEBUG(ErrorStyle.Render("Unknown data point encountered: ", string(b)))
 		}
+	}
 
+	if c.HostFilter != "" {
+		dps = shared.HostFilter(c.HostFilter, dps)
 	}
 
 	if c.PrintFull {
-		printDataPointHeaders(dps[0].Type)
-		for i := range dps {
-			dp := dps[i]
-			sp1 := strings.Split(dp.Local, ":")
-			sp2 := strings.Split(sp1[0], ".")
-			s1 := lipgloss.NewStyle().Background(lipgloss.Color(getHex(sp2[len(sp2)-1])))
-			printTableRow(s1, &dp, dp.Type)
-		}
+		printSliceOfDataPoints(dps, c)
 	}
 
 	if c.PrintErrors {
+		if len(errors) > 0 {
+			fmt.Println(" ____ ERRORS ____")
+		}
 		for i := range errors {
 			PrintTError(errors[i])
 		}
+		if len(errors) > 0 {
+			fmt.Println("")
+		}
 	}
 
-	dps10 := math.Ceil((float64(len(dps)) / 100) * 10)
-	dps90 := math.Floor((float64(len(dps)) / 100) * 90)
+	if len(dps) == 0 {
+		fmt.Println("No datapoints found")
+		return
+	}
 
-	slices.SortFunc(dps, func(a shared.DP, b shared.DP) int {
-		if a.RMSH < b.RMSH {
-			return -1
-		} else {
-			return 1
-		}
-	})
+	switch dps[0].Type {
+	case shared.LatencyTest:
+		analyzeLatencyTest(dps, c)
+	case shared.BandwidthTest:
+		fmt.Println("")
+		fmt.Println("Detailed analysis for bandwidth testing is in development")
+	}
+
+	return nil
+}
+
+func analyzeLatencyTest(dps []shared.DP, c shared.Config) {
+	shared.SortDataPoints(dps, c)
+
+	dps10 := math.Ceil((float64(len(dps)) / 100) * 10)
+	dps50 := math.Floor((float64(len(dps)) / 100) * 50)
+	dps90 := math.Floor((float64(len(dps)) / 100) * 90)
+	dps99 := math.Floor((float64(len(dps)) / 100) * 99)
 
 	dps10s := make([]shared.DP, 0)
 	dps50s := make([]shared.DP, 0)
 	dps90s := make([]shared.DP, 0)
+	dps99s := make([]shared.DP, 0)
 
-	// total, sum, low, mean, high
+	// count, sum, low, avg, high
 	dps10stats := []int64{0, 0, math.MaxInt64, 0, 0}
 	dps50stats := []int64{0, 0, math.MaxInt64, 0, 0}
 	dps90stats := []int64{0, 0, math.MaxInt64, 0, 0}
+	dps99stats := []int64{0, 0, math.MaxInt64, 0, 0}
 
 	for i := range dps {
-		if i <= int(dps10) {
+		if i >= int(dps10) {
 			dps10s = append(dps10s, dps[i])
-			updateBracketStats(dps10stats, dps[i])
-		} else if i >= int(dps90) {
-			dps90s = append(dps90s, dps[i])
-			updateBracketStats(dps90stats, dps[i])
-		} else {
+			shared.UpdatePSStats(dps10stats, dps[i], c)
+		}
+		if i >= int(dps50) {
 			dps50s = append(dps50s, dps[i])
-			updateBracketStats(dps50stats, dps[i])
+			shared.UpdatePSStats(dps50stats, dps[i], c)
+		}
+		if i >= int(dps90) {
+			dps90s = append(dps90s, dps[i])
+			shared.UpdatePSStats(dps90stats, dps[i], c)
+		}
+		if i >= int(dps99) {
+			dps99s = append(dps99s, dps[i])
+			shared.UpdatePSStats(dps99stats, dps[i], c)
 		}
 	}
 
 	fmt.Println("")
+	fmt.Println(" _____ P99 data points _____ ")
 	fmt.Println("")
-	fmt.Println("")
+	printSliceOfDataPoints(dps99s, c)
 
-	fmt.Println(" First 10% of data points")
-	printBracker(dps10stats, SuccessStyle)
 	fmt.Println("")
-	fmt.Println(" Between 10% and 90%")
-	printBracker(dps50stats, WarningStyle)
-	fmt.Println("")
-	fmt.Println(" Last 10% of data points")
-	printBracker(dps90stats, ErrorStyle)
-	fmt.Println("")
-	return nil
-}
-
-func printBracker(b []int64, style lipgloss.Style) {
-	fmt.Println(style.Render(
-		fmt.Sprintf(" Total %d | Low %d | Avg %d | High %d | Microseconds ",
-			b[0],
-			b[2],
-			b[3],
-			b[4],
-		),
-	))
-}
-
-func updateBracketStats(b []int64, dp shared.DP) {
-	b[0]++
-	b[1] += dp.RMSH
-	if dp.RMSH < b[2] {
-		b[2] = dp.RMSH
+	if c.Sort == "" {
+		fmt.Println(" Sorting:", shared.SortDefault)
+	} else {
+		fmt.Println(" Sorting:", c.Sort)
 	}
-	b[3] = b[1] / b[0]
-	if dp.RMSH > b[4] {
-		b[4] = dp.RMSH
+	if c.Micro {
+		fmt.Println(" Time: Microseconds")
+	} else {
+		fmt.Println(" Time: Milliseconds")
 	}
+	fmt.Println("")
+	PrintPercentiles(SuccessStyle, "P10", dps10stats, c)
+	PrintPercentiles(WarningStyle, "P50", dps50stats, c)
+	PrintPercentiles(ErrorStyle, "P90", dps90stats, c)
+	PrintPercentiles(ErrorStyle, "P99", dps99stats, c)
 }
 
 func MakeCSV(ctx context.Context, c shared.Config) (err error) {
@@ -731,4 +744,33 @@ func dpToSlice(dp *shared.DP) (data []string) {
 		data[i] = fmt.Sprintf("%v", v.Field(i).Interface())
 	}
 	return
+}
+
+func transformDataPointsToMilliseconds(dps []shared.DP) (clone []shared.DP) {
+	clone = make([]shared.DP, len(dps))
+	copy(clone, dps)
+	for i := range clone {
+		clone[i].TTFBH = clone[i].TTFBH / 1000
+		clone[i].TTFBL = clone[i].TTFBL / 1000
+		clone[i].RMSH = clone[i].RMSH / 1000
+		clone[i].RMSL = clone[i].RMSL / 1000
+	}
+	return
+}
+
+func printSliceOfDataPoints(dps []shared.DP, c shared.Config) {
+	var data []shared.DP
+	if !c.Micro {
+		data = transformDataPointsToMilliseconds(dps)
+	} else {
+		data = dps
+	}
+
+	for i := range data {
+		if i%20 == 0 {
+			printDataPointHeaders(data[0].Type)
+		}
+		dp := data[i]
+		printTableRow(BaseStyle, &dp, dp.Type)
+	}
 }
