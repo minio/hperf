@@ -406,7 +406,7 @@ func RunTest(ctx context.Context, c shared.Config) (err error) {
 		if printCount%10 == 1 {
 			printRealTimeHeaders(tt)
 		}
-		printRealTimeRow(SuccessStyle, to, tt)
+		printRealTimeRow(BaseStyle, to, tt)
 
 		return false
 	}
