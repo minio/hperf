@@ -33,8 +33,7 @@ WARNING: do not expose `--address` to the internet
 <b>NOTE: if the `--address` is not the same as your external IP addres used for communications between servers then you need to set `--real-ip`, otherwise the server will report internal IPs in the stats and it will run the test against itself, causing invalid results.</b>
 
 ### The listen command
-Hperf can run tests without a specific `client` needing to be constantly connected. Once the `client` has started a test, the `client` can 
-easily exit without interrupting the test stopping.
+Hperf can run tests without a specific `client` needing to be constantly connected. Once the `client` has started a test, the `client` can easily exit without interrupting the test stopping.
 
 Any `client` can hook into the list test at runtime using the `--id` of the test. There can even be multiple `clients`
 listening to the same test.
@@ -129,11 +128,19 @@ The analysis will show:
  - Memory (Mem high/low/used): 
  - CPU (CPU high/low/used): 
 
-## Example: 20 second HTTP payload transfer test using multiple sockets
-This test will use 12 concurrent workers to send http requests with a payload without any timeout between requests.
-Much like a bandwidth test, but it will also test server behaviour when multiple sockets are being created and closed:
+## Live feed statistics
+Live stats are calculated as high/low for all data points seen up until the current time.
+
+## Example: Basic latency testing
+This will run a 20 second latency test and analyze+print the results when done
 ```
-$ ./hperf requests --hosts file:./hosts --id http-test-1 --duration 20 --concurrency 12
+$ ./hperf latency --hosts file:./hosts --port [PORT] --duration 20 --print-all
+```
+
+## Example: Basic bandwidth testing
+This will run a 20 second bandwidth test and print the results when done
+```
+$ ./hperf bandwidth --hosts file:./hosts --port [PORT] --duration 20 --concurrency 10 --print-all
 ```
 
 ## Example: 20 second HTTP payload transfer test using a stream
@@ -149,14 +156,33 @@ $ ./hperf latency --hosts file:./hosts --id http-test-2 --duration 360 --concurr
 --bufferSize 1000 --payloadSize 1000
 ```
 
-# Full test scenario with analysis and csv export
-## On the server
+# Full test scenario using (requests, download, analysis and csv export)
+## On the servers
 ```bash
-$ ./hperf server --address 10.10.2.10:5000 --real-ip 150.150.20.2 --storage-path /tmp/hperf/
+$ ./hperf server --address 0.0.0.0:6000 --real-ip 10.10.10.2 --storage-path /tmp/hperf/
 ```
 
 ## The client
 
+### Run test
+```bash
+ ./hperf requests --hosts 10.10.10.{2...3} --port 6000 --duration 10 --request-delay 100 --concurrency 1 --buffer-size 1000 --payload-size 1000 --restart-on-error --id latency-test-1
+```
+
+### Download test
+```bash
+./hperf download --hosts 10.10.10.{2...3} --port 6000 --id latency-test-1 --file latency-test-1
+```
+
+### Analyze test
+```bash
+./hperf analyze --file latency-test-1 --print-stats --print-errors
+```
+
+### Export csv
+```bash
+./hperf csv --file latency-test-1
+```
 
 
 

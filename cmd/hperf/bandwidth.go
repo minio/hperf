@@ -18,6 +18,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/minio/cli"
 	"github.com/minio/hperf/client"
 	"github.com/minio/hperf/shared"
@@ -25,19 +27,18 @@ import (
 
 var bandwidthCMD = cli.Command{
 	Name:   "bandwidth",
-	Usage:  "start a test to measure bandwidth, open --concurrency number of sockets, write data upto --duration",
+	Usage:  "Start a test to measure bandwidth",
 	Action: runBandwidth,
 	Flags: []cli.Flag{
 		hostsFlag,
 		portFlag,
-		concurrencyFlag,
 		durationFlag,
-		testIDFlag,
-		bufferSizeFlag,
-		payloadSizeFlag,
-		restartOnErrorFlag,
-		dnsServerFlag,
 		saveTestFlag,
+		testIDFlag,
+		concurrencyFlag,
+		dnsServerFlag,
+		microSecondsFlag,
+		printAllFlag,
 	},
 	CustomHelpTemplate: `NAME:
   {{.HelpName}} - {{.Usage}}
@@ -45,23 +46,21 @@ var bandwidthCMD = cli.Command{
 USAGE:
   {{.HelpName}} [FLAGS]
 
-NOTE:
-  Matching concurrency with your thread count can often lead to
-  improved performance, it is even better to run concurrency at
-  50% of the GOMAXPROCS.
+NOTES:
+	When testing for bandwidth it is recommended to start with concurrency 10 and increase the count as needed. Normally 10 is enough to saturate a 100Gb NIC.
 
 FLAGS:
   {{range .VisibleFlags}}{{.}}
   {{end}}
 EXAMPLES:
-  1. Run a basic test:
-   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
+  1. Run a basic test which prints all data points when finished:
+   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --print-all
 
   2. Run a test with custom concurrency:
-   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --concurrency 24
+   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --concurrency 10
 
-  3. Run a test with custom buffer sizes, for MTU specific testing:
-   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --bufferSize 9000 --payloadSize 9000
+  3. Run a 30 seconds bandwidth test:
+   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --duration 30 --id bandwidth-30
 `,
 }
 
@@ -70,6 +69,24 @@ func runBandwidth(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	config.TestType = shared.BandwidthTest
-	return client.RunTest(GlobalContext, *config)
+
+	config.TestType = shared.StreamTest
+	config.BufferSize = 32000
+	config.PayloadSize = 32000
+	config.RequestDelay = 0
+	config.RestartOnError = true
+
+	fmt.Println("")
+	shared.INFO(" Test ID:", config.TestID)
+	fmt.Println("")
+
+	err = client.RunTest(GlobalContext, *config)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("")
+	shared.INFO(" Testing finished..")
+
+	return client.AnalyzeBandwidthTest(GlobalContext, *config)
 }
