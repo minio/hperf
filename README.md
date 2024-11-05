@@ -33,10 +33,10 @@ WARNING: do not expose `--address` to the internet
 <b>NOTE: if the `--address` is not the same as your external IP addres used for communications between servers then you need to set `--real-ip`, otherwise the server will report internal IPs in the stats and it will run the test against itself, causing invalid results.</b>
 
 ### The listen command
-Hperf can run tests without a specific `client` needing to be constantly connected. Once the `client` has started a test, the `client` can easily exit without interrupting the test stopping.
+Hperf can run tests without a specific `client` needing to be constantly connected. Once the `client` has started a test, the `client` can exit without affecting the test.
 
-Any `client` can hook into the list test at runtime using the `--id` of the test. There can even be multiple `clients`
-listening to the same test.
+Any `client` can hook into the list test at runtime using the `--id` of the test.
+There can even be multiple `clients` listening to the same test.
 
 Example:
 ```bash

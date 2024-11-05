@@ -114,7 +114,7 @@ var (
 		Name:   "duration",
 		Value:  30,
 		EnvVar: "HPERF_DURATION",
-		Usage:  "controls how long a test will run in Seconds",
+		Usage:  "controls how long a test will run in seconds",
 	}
 	bufferSizeFlag = cli.IntFlag{
 		Name:   "buffer-size",
@@ -246,7 +246,7 @@ func parseConfig(ctx *cli.Context) (*shared.Config, error) {
 
 	concur := ctx.Int(concurrencyFlag.Name)
 	if concur == 0 {
-		concur = runtime.NumCPU() / 2
+		concur = max(1, runtime.NumCPU()/2)
 		if concur == 0 {
 			concur = 1
 		}
