@@ -114,7 +114,7 @@ var (
 		Name:   "duration",
 		Value:  30,
 		EnvVar: "HPERF_DURATION",
-		Usage:  "controls how long a test will run",
+		Usage:  "controls how long a test will run in seconds",
 	}
 	bufferSizeFlag = cli.IntFlag{
 		Name:   "buffer-size",
@@ -153,7 +153,11 @@ var (
 	}
 	printStatsFlag = cli.BoolFlag{
 		Name:  "print-stats",
-		Usage: "Print stat points",
+		Usage: "Print data points",
+	}
+	printAllFlag = cli.BoolFlag{
+		Name:  "print-all",
+		Usage: "Print all data points",
 	}
 	microSecondsFlag = cli.BoolFlag{
 		Name:  "micro",
@@ -183,9 +187,10 @@ var (
 		bandwidthCMD,
 		csvCMD,
 		deleteCMD,
-		latencyCMD,
+		latency,
 		listenCMD,
 		listTestsCMD,
+		requestsCMD,
 		serverCMD,
 		statDownloadCMD,
 		stopCMD,
@@ -239,6 +244,14 @@ func before(ctx *cli.Context) error {
 func parseConfig(ctx *cli.Context) (*shared.Config, error) {
 	shared.DebugEnabled = debug
 
+	concur := ctx.Int(concurrencyFlag.Name)
+	if concur == 0 {
+		concur = max(1, runtime.NumCPU()/2)
+		if concur == 0 {
+			concur = 1
+		}
+	}
+
 	var config *shared.Config
 	hosts, err := shared.ParseHosts(
 		ctx.String(hostsFlag.Name),
@@ -253,19 +266,19 @@ func parseConfig(ctx *cli.Context) (*shared.Config, error) {
 		Debug:          debug,
 		Hosts:          hosts,
 		Insecure:       insecure,
-		TestType:       shared.LatencyTest,
+		TestType:       shared.RequestTest,
 		Duration:       ctx.Int(durationFlag.Name),
 		RequestDelay:   ctx.Int(delayFlag.Name),
 		Concurrency:    ctx.Int(concurrencyFlag.Name),
-		Proc:           ctx.Int(concurrencyFlag.Name),
 		PayloadSize:    ctx.Int(payloadSizeFlag.Name),
-		BufferKB:       ctx.Int(bufferSizeFlag.Name),
+		BufferSize:     ctx.Int(bufferSizeFlag.Name),
 		Port:           ctx.String(portFlag.Name),
 		Save:           ctx.BoolT(saveTestFlag.Name),
 		TestID:         ctx.String(testIDFlag.Name),
 		RestartOnError: ctx.BoolT(restartOnErrorFlag.Name),
 		File:           ctx.String(fileFlag.Name),
-		PrintFull:      ctx.Bool(printStatsFlag.Name),
+		PrintStats:     ctx.Bool(printStatsFlag.Name),
+		PrintAll:       ctx.Bool(printAllFlag.Name),
 		PrintErrors:    ctx.Bool(printErrFlag.Name),
 		Sort:           shared.SortType(ctx.String(sortFlag.Name)),
 		Micro:          ctx.Bool(microSecondsFlag.Name),

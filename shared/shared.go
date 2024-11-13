@@ -100,9 +100,8 @@ const (
 
 const (
 	Unknown TestType = iota
-	LatencyTest
-	BandwidthTest
-	// HTTPTest
+	RequestTest
+	StreamTest
 )
 
 const (
@@ -146,10 +145,9 @@ type DataReponseToClient struct {
 type Config struct {
 	Debug          bool          `json:"Debug"`
 	Port           string        `json:"Port"`
-	Proc           int           `json:"Proc"`
 	Concurrency    int           `json:"Concurrency"`
 	PayloadSize    int           `json:"PayloadMB"`
-	BufferKB       int           `json:"BufferKB"`
+	BufferSize     int           `json:"BufferKB"`
 	Duration       int           `json:"Duration"`
 	RequestDelay   int           `json:"RequestDelay"`
 	Hosts          []string      `json:"Hosts"`
@@ -164,7 +162,8 @@ type Config struct {
 
 	// Client Only
 	ResolveHosts string   `json:"-"`
-	PrintFull    bool     `json:"-"`
+	PrintStats   bool     `json:"-"`
+	PrintAll     bool     `json:"-"`
 	PrintErrors  bool     `json:"-"`
 	Sort         SortType `json:"-"`
 	Micro        bool     `json:"-"`

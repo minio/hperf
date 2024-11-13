@@ -191,9 +191,9 @@ func PrintColumns(style lipgloss.Style, columns ...column) {
 
 func printDataPointHeaders(t shared.TestType) {
 	switch t {
-	case shared.BandwidthTest:
+	case shared.StreamTest:
 		printHeader(BandwidthHeaders)
-	case shared.LatencyTest:
+	case shared.RequestTest:
 		printHeader(LatencyHeaders)
 	default:
 		printHeader(FullDataPointHeaders)
@@ -202,9 +202,9 @@ func printDataPointHeaders(t shared.TestType) {
 
 func printRealTimeHeaders(t shared.TestType) {
 	switch t {
-	case shared.BandwidthTest:
+	case shared.StreamTest:
 		printHeader(RealTimeBandwidthHeaders)
-	case shared.LatencyTest:
+	case shared.RequestTest:
 		printHeader(RealTimeLatencyHeaders)
 	default:
 	}
@@ -212,7 +212,7 @@ func printRealTimeHeaders(t shared.TestType) {
 
 func printRealTimeRow(style lipgloss.Style, entry *shared.TestOutput, t shared.TestType) {
 	switch t {
-	case shared.BandwidthTest:
+	case shared.StreamTest:
 		PrintColumns(
 			style,
 			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
@@ -227,7 +227,7 @@ func printRealTimeRow(style lipgloss.Style, entry *shared.TestOutput, t shared.T
 			column{formatInt(int64(entry.CL)), headerSlice[CPULow].width},
 		)
 		return
-	case shared.LatencyTest:
+	case shared.RequestTest:
 		PrintColumns(
 			style,
 			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
@@ -252,7 +252,7 @@ func printRealTimeRow(style lipgloss.Style, entry *shared.TestOutput, t shared.T
 
 func printTableRow(style lipgloss.Style, entry *shared.DP, t shared.TestType) {
 	switch t {
-	case shared.BandwidthTest:
+	case shared.StreamTest:
 		PrintColumns(
 			style,
 			column{entry.Created.Format("15:04:05"), headerSlice[Created].width},
@@ -265,7 +265,7 @@ func printTableRow(style lipgloss.Style, entry *shared.DP, t shared.TestType) {
 			column{formatInt(int64(entry.CPUUsedPercent)), headerSlice[CPUUsage].width},
 		)
 		return
-	case shared.LatencyTest:
+	case shared.RequestTest:
 		PrintColumns(
 			style,
 			column{entry.Created.Format("15:04:05"), headerSlice[Created].width},

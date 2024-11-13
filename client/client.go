@@ -406,7 +406,7 @@ func RunTest(ctx context.Context, c shared.Config) (err error) {
 		}
 
 		for i := range responseERR {
-			fmt.Println(responseERR[i])
+			PrintErrorString(responseERR[i].Error)
 		}
 
 		if printCount%10 == 1 {
@@ -553,6 +553,66 @@ func DownloadTest(ctx context.Context, c shared.Config) (err error) {
 	return nil
 }
 
+func AnalyzeBandwidthTest(ctx context.Context, c shared.Config) (err error) {
+	_, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	if c.PrintAll {
+		shared.INFO(" Printing all data points ..")
+		fmt.Println("")
+
+		printSliceOfDataPoints(responseDPS, c)
+
+		if len(responseERR) > 0 {
+			fmt.Println(" ____ ERRORS ____")
+		}
+		for i := range responseERR {
+			PrintTError(responseERR[i])
+		}
+		if len(responseERR) > 0 {
+			fmt.Println("")
+		}
+	}
+
+	if len(responseDPS) == 0 {
+		fmt.Println("No datapoints found")
+		return
+	}
+
+	return nil
+}
+
+func AnalyzeLatencyTest(ctx context.Context, c shared.Config) (err error) {
+	_, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	if c.PrintAll {
+		shared.INFO(" Printing all data points ..")
+
+		printSliceOfDataPoints(responseDPS, c)
+
+		if len(responseERR) > 0 {
+			fmt.Println(" ____ ERRORS ____")
+		}
+		for i := range responseERR {
+			PrintTError(responseERR[i])
+		}
+		if len(responseERR) > 0 {
+			fmt.Println("")
+		}
+	}
+	if len(responseDPS) == 0 {
+		fmt.Println("No datapoints found")
+		return
+	}
+
+	shared.INFO(" Analyzing data ..")
+	fmt.Println("")
+	analyzeLatencyTest(responseDPS, c)
+
+	return nil
+}
+
 func AnalyzeTest(ctx context.Context, c shared.Config) (err error) {
 	_, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -592,7 +652,7 @@ func AnalyzeTest(ctx context.Context, c shared.Config) (err error) {
 		dps = shared.HostFilter(c.HostFilter, dps)
 	}
 
-	if c.PrintFull {
+	if c.PrintStats {
 		printSliceOfDataPoints(dps, c)
 	}
 
@@ -614,9 +674,9 @@ func AnalyzeTest(ctx context.Context, c shared.Config) (err error) {
 	}
 
 	switch dps[0].Type {
-	case shared.LatencyTest:
+	case shared.RequestTest:
 		analyzeLatencyTest(dps, c)
-	case shared.BandwidthTest:
+	case shared.StreamTest:
 		fmt.Println("")
 		fmt.Println("Detailed analysis for bandwidth testing is in development")
 	}

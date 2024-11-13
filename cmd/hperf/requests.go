@@ -18,26 +18,28 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/minio/cli"
 	"github.com/minio/hperf/client"
 	"github.com/minio/hperf/shared"
 )
 
-var latency = cli.Command{
-	Name:   "latency",
-	Usage:  "Start a latency test and analyze the results",
+var requestsCMD = cli.Command{
+	Name:   "requests",
+	Usage:  "Start a test which uses multiple http requests to measure performance",
 	Action: runLatency,
 	Flags: []cli.Flag{
 		hostsFlag,
 		portFlag,
+		concurrencyFlag,
+		delayFlag,
 		durationFlag,
+		bufferSizeFlag,
+		payloadSizeFlag,
+		restartOnErrorFlag,
 		testIDFlag,
 		saveTestFlag,
 		dnsServerFlag,
 		microSecondsFlag,
-		printAllFlag,
 	},
 	CustomHelpTemplate: `NAME:
   {{.HelpName}} - {{.Usage}}
@@ -49,36 +51,25 @@ FLAGS:
   {{range .VisibleFlags}}{{.}}
   {{end}}
 EXAMPLES:
-  1. Run a 30 second latency test and show all data points after the test finishes:
-   {{.Prompt}} {{.HelpName}} --duration 30 --hosts 10.10.10.1,10.10.10.2 --print-all
+  1. Run a basic test:
+   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
 
-  2. Run a 30 second latency test with custom id:
-   {{.Prompt}} {{.HelpName}} --duration 60 --hosts 10.10.10.1,10.10.10.2 --id latency-60
+  2. Run a slow moving test to probe latency:
+   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --request-delay 100 --concurrency 1
+
+  3. Run a high throughput test to probe bandwidth:
+   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --request-delay 0 --concurrency 10
+
+  4. Run a high throughput test with 1MB payload size:
+   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --request-delay 0 --concurrency 10 --payload-size 1000000
 `,
 }
 
-func runLatency(ctx *cli.Context) error {
+func runRequests(ctx *cli.Context) error {
 	config, err := parseConfig(ctx)
 	if err != nil {
 		return err
 	}
 	config.TestType = shared.RequestTest
-	config.BufferSize = 1000
-	config.PayloadSize = 1000
-	config.Concurrency = 1
-	config.RequestDelay = 200
-	config.RestartOnError = true
-
-	fmt.Println("")
-	shared.INFO(" Test ID:", config.TestID)
-	fmt.Println("")
-
-	err = client.RunTest(GlobalContext, *config)
-	if err != nil {
-		return err
-	}
-	fmt.Println("")
-	shared.INFO(" Testing finished ..")
-
-	return client.AnalyzeLatencyTest(GlobalContext, *config)
+	return client.RunTest(GlobalContext, *config)
 }

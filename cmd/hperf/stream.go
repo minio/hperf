@@ -18,26 +18,26 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/minio/cli"
 	"github.com/minio/hperf/client"
 	"github.com/minio/hperf/shared"
 )
 
-var latency = cli.Command{
-	Name:   "latency",
-	Usage:  "Start a latency test and analyze the results",
-	Action: runLatency,
+var streamCMD = cli.Command{
+	Name:   "stream",
+	Usage:  "Start a test which uses an HTTP body stream to measure bandwidth",
+	Action: runStream,
 	Flags: []cli.Flag{
 		hostsFlag,
 		portFlag,
+		concurrencyFlag,
 		durationFlag,
 		testIDFlag,
-		saveTestFlag,
+		bufferSizeFlag,
+		payloadSizeFlag,
+		restartOnErrorFlag,
 		dnsServerFlag,
-		microSecondsFlag,
-		printAllFlag,
+		saveTestFlag,
 	},
 	CustomHelpTemplate: `NAME:
   {{.HelpName}} - {{.Usage}}
@@ -45,40 +45,31 @@ var latency = cli.Command{
 USAGE:
   {{.HelpName}} [FLAGS]
 
+NOTE:
+  Matching concurrency with your thread count can often lead to
+  improved performance, it is even better to run concurrency at
+  50% of the GOMAXPROCS.
+
 FLAGS:
   {{range .VisibleFlags}}{{.}}
   {{end}}
 EXAMPLES:
-  1. Run a 30 second latency test and show all data points after the test finishes:
-   {{.Prompt}} {{.HelpName}} --duration 30 --hosts 10.10.10.1,10.10.10.2 --print-all
+  1. Run a basic test:
+   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2
 
-  2. Run a 30 second latency test with custom id:
-   {{.Prompt}} {{.HelpName}} --duration 60 --hosts 10.10.10.1,10.10.10.2 --id latency-60
+  2. Run a test with custom concurrency:
+   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --concurrency 24
+
+  3. Run a test with custom buffer and payload size:
+   {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --bufferSize 9000 --payloadSize 9000
 `,
 }
 
-func runLatency(ctx *cli.Context) error {
+func runStream(ctx *cli.Context) error {
 	config, err := parseConfig(ctx)
 	if err != nil {
 		return err
 	}
-	config.TestType = shared.RequestTest
-	config.BufferSize = 1000
-	config.PayloadSize = 1000
-	config.Concurrency = 1
-	config.RequestDelay = 200
-	config.RestartOnError = true
-
-	fmt.Println("")
-	shared.INFO(" Test ID:", config.TestID)
-	fmt.Println("")
-
-	err = client.RunTest(GlobalContext, *config)
-	if err != nil {
-		return err
-	}
-	fmt.Println("")
-	shared.INFO(" Testing finished ..")
-
-	return client.AnalyzeLatencyTest(GlobalContext, *config)
+	config.TestType = shared.StreamTest
+	return client.RunTest(GlobalContext, *config)
 }

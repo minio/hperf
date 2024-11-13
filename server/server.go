@@ -216,12 +216,12 @@ func startAPIandWS(ctx context.Context) (err error) {
 		}
 	}))
 
-	httpServer.Put("/latency", func(c *fiber.Ctx) error {
+	httpServer.Put("/requests", func(c *fiber.Ctx) error {
 		io.Copy(io.Discard, bytes.NewBuffer(c.Body()))
 		return c.SendStatus(200)
 	})
 
-	httpServer.Put("/bandwidth", func(c *fiber.Ctx) error {
+	httpServer.Put("/stream", func(c *fiber.Ctx) error {
 		io.Copy(io.Discard, c.Request().BodyStream())
 		return c.SendStatus(200)
 	})
@@ -458,7 +458,7 @@ func (a *asyncReader) Read(b []byte) (n int, err error) {
 		return 0, io.EOF
 	}
 
-	if a.c.TestType == shared.BandwidthTest {
+	if a.c.TestType == shared.StreamTest {
 		n = copy(b, a.pr.buf)
 		a.pr.TX.Add(uint64(n))
 		return n, nil
@@ -664,8 +664,8 @@ func newTransport(c *shared.Config) *http.Transport {
 		Proxy:                 http.ProxyFromEnvironment,
 		DialContext:           newDialContext(10 * time.Second),
 		MaxIdleConnsPerHost:   1024,
-		WriteBufferSize:       c.BufferKB,
-		ReadBufferSize:        c.BufferKB,
+		WriteBufferSize:       c.BufferSize,
+		ReadBufferSize:        c.BufferSize,
 		IdleConnTimeout:       15 * time.Second,
 		ResponseHeaderTimeout: 15 * time.Minute,
 		TLSHandshakeTimeout:   10 * time.Second,
@@ -705,6 +705,12 @@ func newPerformanceReaderForASingleHost(c *shared.Config, host string, port stri
 }
 
 func startPerformanceReader(t *test, r *netPerfReader) {
+	defer func() {
+		r := recover()
+		if r != nil {
+			log.Println(r, string(debug.Stack()))
+		}
+	}()
 	for {
 		var cid int
 		select {
@@ -750,15 +756,13 @@ func sendRequestToHost(t *test, r *netPerfReader, cid int) {
 
 	route := "/404"
 	var body io.Reader
-	method := http.MethodGet
+	method := http.MethodPut
 	switch t.Config.TestType {
-	case shared.BandwidthTest:
-		route = "/bandwidth"
+	case shared.StreamTest:
+		route = "/stream"
 		body = io.NopCloser(AR)
-		method = http.MethodPut
-	case shared.LatencyTest:
-		method = http.MethodPut
-		route = "/latency"
+	case shared.RequestTest:
+		route = "/requests"
 		body = AR
 	default:
 		t.AddError(fmt.Errorf("Unknown test type: %d", t.Config.TestType), "unknown-signal")
@@ -775,7 +779,7 @@ func sendRequestToHost(t *test, r *netPerfReader, cid int) {
 		return
 	}
 
-	if t.Config.TestType == shared.BandwidthTest {
+	if t.Config.TestType == shared.StreamTest {
 		req.ContentLength = -1
 	}
 
