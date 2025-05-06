@@ -165,7 +165,7 @@ Here is a breakdown of the individual stats:
  - `TX(high/low)`: highest and lowest transfer rate seen ( single server )
  - `RMS(high/low)`: longest and fastest round trip latency ( single server )
  - `TTFB(high/low)`: The time it took to read the first byte ( single server ) 
- - `#Dropped`: total number of dropped packets ( all servers )
+ - `#Dropped`: highest count of dropped packets ( single server )
  - `Mem(high/low)`: highest and lowest memory usage ( single server )
  - `CPU(high/low)`: highest and lowest cpu usage ( single server )
 
