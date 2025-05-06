@@ -1,6 +1,6 @@
 module github.com/minio/hperf
 
-go 1.24
+go 1.24.2
 
 require (
 	github.com/charmbracelet/lipgloss v0.13.0
