@@ -363,7 +363,10 @@ func RunTest(ctx context.Context, c shared.Config) (err error) {
 		for i := range responseDPS {
 			to.TXC += responseDPS[i].TXCount
 			to.TXT += responseDPS[i].TXTotal
-			to.DP = responseDPS[i].DroppedPackets
+
+			if to.DP < responseDPS[i].DroppedPackets {
+				to.DP = responseDPS[i].DroppedPackets
+			}
 
 			if to.TXL > responseDPS[i].TX {
 				to.TXL = responseDPS[i].TX
