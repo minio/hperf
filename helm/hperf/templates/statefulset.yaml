@@ -40,7 +40,7 @@ spec:
             - "/tmp/hperf/"
           ports:
             - name: server
-              containerPort: {{ .Values.hperf.port | default 9010}}
+              containerPort: {{ .Values.hperf.port}}
           volumeMounts:
             {{- if .Values.hperf.hperfVolume.type }}
             - name: hperf-volume
