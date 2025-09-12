@@ -7,9 +7,6 @@ metadata:
   labels:
     app: hperf-latency
     {{- include "hperf.labels" . | nindent 4 }}
-  annotations:
-    "helm.sh/hook": post-install
-    "helm.sh/hook-weight": "1"
 spec:
   template:
     metadata:
