@@ -1,0 +1,68 @@
+{{- if .Values.latency }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ template "hperf.fullname" . }}-latency
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    app: hperf-latency
+    {{- include "hperf.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "1"
+spec:
+  template:
+    metadata:
+      labels:
+        app: hperf-latency
+        {{- include "hperf.labels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "hperf.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: hperf-latency
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - "latency"
+            - "--hosts"
+            - {{ range $i, $e := until ($.Values.replicaCount | int) -}}
+            {{ template "hperf.fullname" $ }}-{{ $i }}.{{ template "hperf.fullname" $ }}.{{ $.Release.Namespace }}.svc.{{ $.Values.clusterDomain }}{{- if lt (add1 $i) ($.Values.replicaCount | int) }},{{ end -}}
+            {{- end }}
+            - "--port"
+            - "{{ .Values.hperf.port }}"
+            - "--id"
+            - {{ .Values.latency.id | default (include "hperf.fullname" .) | quote }}
+            {{- if .Values.latency.duration }}
+            - "--duration"
+            - "{{ .Values.latency.duration }}"
+            {{- end }}
+            {{- if .Values.bandwidth.printAll }}
+            - "--print-all"
+            {{- end }}
+            {{- if .Values.bandwidth.micro }}
+            - "--micro"
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: Never
+{{- end }}

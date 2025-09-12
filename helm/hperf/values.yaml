@@ -8,7 +8,7 @@ image:
   repository: quay.io/minio/hperf
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: v4.0.5
+  tag: v5.0.5
 
 imagePullSecrets: []
 
@@ -63,3 +63,52 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+hperf:
+    # Port to run hperf server listening in 0.0.0.0:{{ port }}
+  port: 9010
+  # volumeType: emptyDir, hostPath, persistentVolumeClaim
+  volumeType: emptyDir
+  hperfVolume:
+    emptyDir:
+      sizeLimit: 1Gi
+    # HostPath configuration (used when type: hostPath)
+    # hostPath:
+    #   path: /host/tmp/hperf
+    #   type: DirectoryOrCreate
+
+    # When volumeType is persistentVolumeClaim
+    # volumeClaimTemplate:
+    # - metadata:
+    #     name: data
+    #   spec:
+    #     accessModes: [ "ReadWriteOnce" ]
+    #     resources:
+    #       requests:
+    #         storage: 10Gi
+
+# bandwidth will start hperf as a client in a Job to perform a benchmark of throughput
+# 'hperf bandwidth' uses the chart name as test id by default
+bandwidth:
+  # set a custom test id, default to chart name
+  id: bandwidth-test
+  # duration of the test in seconds
+  duration: 30
+  # number of concurrent clients
+  concurrency: 10
+  # print all data points
+  printAll: false
+  #Display timers in microseconds instead of milliseconds
+  micro: false
+
+# latency will start hperf as a client in a Job to perform a benchmark of latency
+# 'hperf latency' uses the chart name as test id by default
+latency:
+  # set a custom test id, default to chart name
+  id: latency-test
+  controls how long a test will run in seconds (default: 30)
+  duration: 30
+  # print all data points
+  printAll: false
+  #Display timers in microseconds instead of milliseconds
+  micro: false

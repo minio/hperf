@@ -8,7 +8,7 @@ spec:
   publishNotReadyAddresses: true
   clusterIP: None  
   ports:
-    - port: 9999
+    - port: {{ .Values.hperf.port }}
       name: http1
   selector:
     app: hperf
