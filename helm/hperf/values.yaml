@@ -68,25 +68,25 @@ hperf:
   labels: {}
     # Port to run hperf server listening in 0.0.0.0:{{ port }}
   port: 9010
-  # volumeType: emptyDir, hostPath, persistentVolumeClaim
-  volumeType: emptyDir
+
+  # Type of volume to use. Supported types are emptyDir hostPath and persistentVolumeClaim
+  # WARNING: Only one volume type can be specified at the time: volumeClaimTemplate, emptyDir, or hostPath
   hperfVolume:
     emptyDir:
       sizeLimit: 1Gi
-    # HostPath configuration (used when type: hostPath)
-    # hostPath:
-    #   path: /host/tmp/hperf
-    #   type: DirectoryOrCreate
+
+#     HostPath configuration (used when type: hostPath)
+#     hostPath:
+#       path: /host/tmp/hperf
+#       type: DirectoryOrCreate
 
     # When volumeType is persistentVolumeClaim
-    # volumeClaimTemplate:
-    # - metadata:
-    #     name: data
-    #   spec:
-    #     accessModes: [ "ReadWriteOnce" ]
-    #     resources:
-    #       requests:
-    #         storage: 10Gi
+#    volumeClaimTemplate:
+#      # The capacity for the volume
+#      size: 100Mi
+#      #storageClassName: standard
+#      # Specify `storageAnnotations <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>`__
+#      storageAnnotations: {}
 
 # bandwidth will start hperf as a client in a Job to perform a benchmark of throughput
 # 'hperf bandwidth' uses the chart name as test id by default

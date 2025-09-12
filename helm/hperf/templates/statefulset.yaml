@@ -42,10 +42,8 @@ spec:
             - name: server
               containerPort: {{ .Values.hperf.port}}
           volumeMounts:
-            {{- if .Values.hperf.hperfVolume.type }}
-            - name: hperf-volume
+            - name: {{ include "hperf.fullname" . }}-volume
               mountPath: /tmp/hperf
-            {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -64,24 +62,45 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
       volumes:
-      {{- if .Values.hperf.volumeType }}
-      - name: hperf-volume
-          {{- if eq .Values.hperf.volumeType "emptyDir" }}
+      - name: {{ include "hperf.fullname" . }}-volume
+      {{- if or (hasKey .Values.hperf.hperfVolume "volumeClaimTemplate") (hasKey .Values.hperf.hperfVolume "emptyDir") (hasKey .Values.hperf.hperfVolume "hostPath" ) }}
+        {{- if .Values.hperf.hperfVolume.emptyDir }}
         emptyDir:
-            {{- with .Values.hperf.hperfVolume.emptyDir }}
-            {{- toYaml . | nindent 10 }}
-            {{- end }}
-          {{- else if eq .Values.hperf.volumeType "hostPath" }}
+          {{- with .Values.hperf.hperfVolume.emptyDir }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        {{ end }}
+        {{- if .Values.hperf.hperfVolume.hostPath }}
         hostPath:
           path: {{ .Values.hperf.hperfVolume.hostPath.path | required "hostPath.path is required when using hostPath volume" }}
           type: {{ .Values.hperf.hperfVolume.hostPath.type | default "DirectoryOrCreate" }}
-            {{- else if eq .Values.hperf.volumeType "persistentVolumeClaim" }}
-        # Default to emptyDir if no volume type specified
-        emptyDir: { }
-            {{- end }}
-        {{- if .Values.hperf.hperfVolume.volumeClaimTemplate }}
-  volumeClaimTemplates:
-    {{- toYaml .Values.hperf.hperfVolume.volumeClaimTemplate | nindent 2 }}
         {{- end }}
+      {{- else }}
+        emptyDir:
+          sizeLimit: 100Mi
+      {{- end }}
+  {{- if .Values.hperf.hperfVolume.volumeClaimTemplate }}
+  volumeClaimTemplates:
+    - metadata:
+        name: {{ include "hperf.fullname" . }}-volume
+        {{- with .Values.hperf.hperfVolume.volumeClaimTemplate.storageAnnotations }}
+        annotations: {{- toYaml . | nindent 12 }}
+        {{- end }}
+      spec:
+            {{- if  .Values.hperf.hperfVolume.volumeClaimTemplate.storageClassName }}
+        storageClassName: {{ .Values.hperf.hperfVolume.volumeClaimTemplate.storageClassName }}
+            {{- end }}
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.hperf.hperfVolume.volumeClaimTemplate.size }}
     {{- end }}
+{{- $hasVCT := hasKey .Values.hperf.hperfVolume "volumeClaimTemplate" }}
+{{- $hasEmptyDir := hasKey .Values.hperf.hperfVolume "emptyDir" }}
+{{- $hasHostPath := hasKey .Values.hperf.hperfVolume "hostPath" }}
+{{- if or (and $hasVCT $hasEmptyDir) (and $hasVCT $hasHostPath) (and $hasEmptyDir $hasHostPath) }}
+  {{- fail "Only one volume type can be specified at the time: volumeClaimTemplate, emptyDir, or hostPath" }}
+{{- end }}
