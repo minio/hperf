@@ -65,6 +65,7 @@ tolerations: []
 affinity: {}
 
 hperf:
+  labels: {}
     # Port to run hperf server listening in 0.0.0.0:{{ port }}
   port: 9010
   # volumeType: emptyDir, hostPath, persistentVolumeClaim
@@ -90,6 +91,7 @@ hperf:
 # bandwidth will start hperf as a client in a Job to perform a benchmark of throughput
 # 'hperf bandwidth' uses the chart name as test id by default
 bandwidth:
+  labels: {}
   # set a custom test id, default to chart name
   id: bandwidth-test
   # duration of the test in seconds
@@ -104,6 +106,7 @@ bandwidth:
 # latency will start hperf as a client in a Job to perform a benchmark of latency
 # 'hperf latency' uses the chart name as test id by default
 latency:
+  labels: {}
   # set a custom test id, default to chart name
   id: latency-test
   controls how long a test will run in seconds (default: 30)
