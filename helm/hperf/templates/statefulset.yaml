@@ -32,10 +32,15 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
           args:
             - "server"
             - "--address"
-            - "0.0.0.0:{{ .Values.hperf.port }}"
+            - "$(POD_IP):{{ .Values.hperf.port }}"
             - "--storage-path"
             - "/tmp/hperf/"
           ports:
