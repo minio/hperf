@@ -337,6 +337,13 @@ func RunTest(ctx context.Context, c shared.Config) (err error) {
 	}
 
 	itterateWebsockets(func(ws *wsClient) {
+		oc := c
+		for i, v := range oc.Hosts {
+			if v == ws.Host {
+				oc.Hosts = slices.Delete(oc.Hosts, i, i+1)
+				break
+			}
+		}
 		err = ws.Con.WriteJSON(ws.NewSignal(shared.RunTest, &c))
 		if err != nil {
 			return
