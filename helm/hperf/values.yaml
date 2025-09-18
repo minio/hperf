@@ -89,7 +89,6 @@ hperf:
 #      storageAnnotations: {}
 
 # bandwidth will start hperf as a client in a Job to perform a benchmark of throughput
-# 'hperf bandwidth' uses the chart name as test id by default
 bandwidth:
   labels: {}
   # set a custom test id, default to chart name
@@ -103,15 +102,14 @@ bandwidth:
   #Display timers in microseconds instead of milliseconds
   micro: false
 
-# latency will start hperf as a client in a Job to perform a benchmark of latency
-# 'hperf latency' uses the chart name as test id by default
-latency:
-  labels: {}
-  # set a custom test id, default to chart name
-  id: latency-test
-  controls how long a test will run in seconds (default: 30)
-  duration: 30
-  # print all data points
-  printAll: true
-  #Display timers in microseconds instead of milliseconds
-  micro: false
+## latency will start hperf as a client in a Job to perform a benchmark of latency
+#latency:
+#  labels: {}
+#  # set a custom test id, default to chart name
+#  id: latency-test
+#  controls how long a test will run in seconds (default: 30)
+#  duration: 30
+#  # print all data points
+#  printAll: true
+#  #Display timers in microseconds instead of milliseconds
+#  micro: false
