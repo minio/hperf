@@ -361,7 +361,7 @@ func SendDone(c *websocket.Conn) error {
 	return c.WriteJSON(msg)
 }
 
-func newTest(c *shared.Config) (t *test, err error) {
+func newTest(c shared.Config) (t *test, err error) {
 	testLock.Lock()
 	defer testLock.Unlock()
 
@@ -369,7 +369,7 @@ func newTest(c *shared.Config) (t *test, err error) {
 	t.errMap = make(map[string]struct{})
 	t.cons = make(map[string]*websocket.Conn)
 	t.Started = time.Now()
-	t.Config = *c
+	t.Config = c
 	t.DPS = make([]shared.DP, 0)
 	t.ID = c.TestID
 	t.ctx, t.cancel = context.WithCancelCause(context.Background())
@@ -686,7 +686,7 @@ func newDialContext(dialTimeout time.Duration) dialContext {
 // DialContext is a function to make custom Dial for internode communications
 type dialContext func(ctx context.Context, network, address string) (net.Conn, error)
 
-func newPerformanceReaderForASingleHost(c *shared.Config, host string, port string) (r *netPerfReader) {
+func newPerformanceReaderForASingleHost(c shared.Config, host string, port string) (r *netPerfReader) {
 	r = new(netPerfReader)
 	r.lastDataPointTime = time.Now()
 	r.addr = net.JoinHostPort(host, port)
@@ -695,7 +695,7 @@ func newPerformanceReaderForASingleHost(c *shared.Config, host string, port stri
 	r.TTFBL = math.MaxInt64
 	r.RMSL = math.MaxInt64
 	r.client = &http.Client{
-		Transport: newTransport(c),
+		Transport: newTransport(&c),
 	}
 	r.concurrency = make(chan int, c.Concurrency)
 	for i := 1; i <= c.Concurrency; i++ {
