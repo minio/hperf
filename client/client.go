@@ -337,10 +337,10 @@ func RunTest(ctx context.Context, c shared.Config) (err error) {
 	}
 
 	itterateWebsockets(func(ws *wsClient) {
-		oc := c
-		for i, v := range oc.Hosts {
+		oh := slices.Clone(c.Hosts)
+		for i, v := range oh {
 			if v == ws.Host {
-				oc.Hosts = slices.Delete(oc.Hosts, i, i+1)
+				oh = slices.Delete(oh, i, i+1)
 				break
 			}
 		}
