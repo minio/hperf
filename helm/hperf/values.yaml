@@ -99,7 +99,7 @@ bandwidth:
   # number of concurrent clients
   concurrency: 10
   # print all data points
-  printAll: false
+  printAll: true
   #Display timers in microseconds instead of milliseconds
   micro: false
 
@@ -112,6 +112,6 @@ latency:
   controls how long a test will run in seconds (default: 30)
   duration: 30
   # print all data points
-  printAll: false
+  printAll: true
   #Display timers in microseconds instead of milliseconds
   micro: false
