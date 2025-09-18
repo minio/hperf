@@ -82,7 +82,7 @@ func runBandwidth(ctx *cli.Context) error {
 
 	err = client.RunTest(GlobalContext, *config)
 	if err != nil {
-		return err
+		return cli.NewExitError(err.Error(), 1)
 	}
 
 	fmt.Println("")
