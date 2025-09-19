@@ -211,8 +211,7 @@ func CreateApp() *cli.App {
 
 	app.Before = before
 	app.OnUsageError = func(context *cli.Context, err error, isSubcommand bool) error {
-		fmt.Println(err)
-		return nil
+		return cli.NewExitError(err.Error(), 1)
 	}
 
 	app.Name = "hperf"
@@ -314,7 +313,7 @@ Error:
 	}
 
 	prettyprint(config, "CONFIG")
-	return config, err
+	return config, cli.NewExitError(err.Error(), 1)
 }
 
 func prettyprint(data *shared.Config, title string) {

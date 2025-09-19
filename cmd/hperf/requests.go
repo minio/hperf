@@ -68,8 +68,12 @@ EXAMPLES:
 func runRequests(ctx *cli.Context) error {
 	config, err := parseConfig(ctx)
 	if err != nil {
-		return err
+		return cli.NewExitError(err.Error(), 1)
 	}
 	config.TestType = shared.RequestTest
-	return client.RunTest(GlobalContext, *config)
+	err = client.RunTest(GlobalContext, *config)
+	if err != nil {
+		return cli.NewExitError(err.Error(), 1)
+	}
+	return nil
 }

@@ -106,7 +106,7 @@ func RunServer(ctx context.Context, address string, rIP string, storagePath stri
 	if storagePath == "" {
 		basePath, err = os.Getwd()
 		if err != nil {
-			return
+			return err
 		}
 	} else {
 		basePath = storagePath
@@ -134,7 +134,7 @@ func RunServer(ctx context.Context, address string, rIP string, storagePath stri
 	shared.INFO("starting 'hperf' server on:", bindAddress)
 	err = startAPIandWS(cancelContext)
 	if err != nil {
-		return
+		return err
 	}
 
 	return nil

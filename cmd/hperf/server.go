@@ -82,10 +82,14 @@ EXAMPLES:
 
 func runServer(ctx *cli.Context) error {
 	shared.DebugEnabled = debug
-	return server.RunServer(
+	err := server.RunServer(
 		GlobalContext,
 		ctx.String("address"),
 		ctx.String("real-ip"),
 		ctx.String("storage-path"),
 	)
+	if err != nil {
+		return cli.NewExitError(err.Error(), 1)
+	}
+	return nil
 }
