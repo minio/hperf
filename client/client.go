@@ -75,6 +75,17 @@ func (c *wsClient) Remove() (err error) {
 	return
 }
 
+func filterSelf(hosts []string, self string) []string {
+	for i, v := range hosts {
+		if v == self {
+			hosts = slices.Delete(hosts, i, i+1)
+			break
+		}
+	}
+
+	return hosts
+}
+
 func itterateWebsockets(action func(c *wsClient)) {
 	for i := range websockets {
 		if websockets[i] == nil {
@@ -337,22 +348,14 @@ func RunTest(ctx context.Context, c shared.Config) (err error) {
 	}
 
 	ogh := slices.Clone(c.Hosts)
-
 	itterateWebsockets(func(ws *wsClient) {
-		oh := slices.Clone(c.Hosts)
-		for i, v := range oh {
-			if v == ws.Host {
-				oh = slices.Delete(oh, i, i+1)
-				break
-			}
-		}
-		c.Hosts = oh
+		oh := slices.Clone(ogh)
+		c.Hosts = filterSelf(oh, ws.Host)
 		err = ws.Con.WriteJSON(ws.NewSignal(shared.RunTest, c))
 		if err != nil {
 			return
 		}
 	})
-
 	c.Hosts = ogh
 
 	printCount := 0
