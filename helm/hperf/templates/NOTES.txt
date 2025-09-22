@@ -1,4 +1,10 @@
 ---
-Look for `hperf` results with `kubectl logs`
+Look for `hperf` bandwidth results
 
-kubectl logs --namespace {{ .Release.Namespace }} --max-log-requests {{ .Values.replicaCount }} -l "app=hperf" -f
+kubectl logs --namespace {{ .Release.Namespace }} -l "app=hperf-bandwidth" -f
+
+{{- if .Values.latency }}
+Look for `hperf` latency results
+
+kubectl logs --namespace {{ .Release.Namespace }} -l "app=hperf-latency" -f
+{{- end }}

@@ -8,7 +8,7 @@ image:
   repository: quay.io/minio/hperf
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: v4.0.5
+  tag: v5.0.5
 
 imagePullSecrets: []
 
@@ -63,3 +63,53 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+hperf:
+  labels: {}
+    # Port to run hperf server listening in 0.0.0.0:{{ port }}
+  port: 9010
+
+  # Type of volume to use. Supported types are emptyDir hostPath and persistentVolumeClaim
+  # WARNING: Only one volume type can be specified at the time: volumeClaimTemplate, emptyDir, or hostPath
+  hperfVolume:
+    emptyDir:
+      sizeLimit: 1Gi
+
+#     HostPath configuration (used when type: hostPath)
+#     hostPath:
+#       path: /host/tmp/hperf
+#       type: DirectoryOrCreate
+
+    # When volumeType is persistentVolumeClaim
+#    volumeClaimTemplate:
+#      # The capacity for the volume
+#      size: 100Mi
+#      #storageClassName: standard
+#      # Specify `storageAnnotations <https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/>`__
+#      storageAnnotations: {}
+
+# bandwidth will start hperf as a client in a Job to perform a benchmark of throughput
+bandwidth:
+  labels: {}
+  # set a custom test id, default to chart name
+  id: bandwidth-test
+  # duration of the test in seconds
+  duration: 30
+  # number of concurrent clients
+  concurrency: 10
+  # print all data points
+  printAll: true
+  #Display timers in microseconds instead of milliseconds
+  micro: false
+
+## latency will start hperf as a client in a Job to perform a benchmark of latency
+#latency:
+#  labels: {}
+#  # set a custom test id, default to chart name
+#  id: latency-test
+#  controls how long a test will run in seconds (default: 30)
+#  duration: 30
+#  # print all data points
+#  printAll: true
+#  #Display timers in microseconds instead of milliseconds
+#  micro: false
