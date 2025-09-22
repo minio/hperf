@@ -310,10 +310,11 @@ Error:
 		fmt.Println(client.ErrorStyle.Render("  " + err.Error()))
 		fmt.Println("")
 		fmt.Println("")
+		return nil, cli.NewExitError(err.Error(), 1)
 	}
 
 	prettyprint(config, "CONFIG")
-	return config, cli.NewExitError(err.Error(), 1)
+	return config, nil
 }
 
 func prettyprint(data *shared.Config, title string) {
