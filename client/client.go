@@ -75,8 +75,19 @@ func (c *wsClient) Remove() (err error) {
 	return
 }
 
+func filterSelf(hosts []string, self string) []string {
+	for i, v := range hosts {
+		if v == self {
+			hosts = slices.Delete(hosts, i, i+1)
+			break
+		}
+	}
+
+	return hosts
+}
+
 func itterateWebsockets(action func(c *wsClient)) {
-	for i := 0; i < len(websockets); i++ {
+	for i := range websockets {
 		if websockets[i] == nil {
 			continue
 		}
@@ -84,7 +95,7 @@ func itterateWebsockets(action func(c *wsClient)) {
 	}
 }
 
-func (c *wsClient) NewSignal(signal shared.SignalType, conf *shared.Config) *shared.WebsocketSignal {
+func (c *wsClient) NewSignal(signal shared.SignalType, conf shared.Config) *shared.WebsocketSignal {
 	msg := new(shared.WebsocketSignal)
 	msg.SType = signal
 	msg.Config = conf
@@ -301,7 +312,7 @@ func Listen(ctx context.Context, c shared.Config) (err error) {
 	}
 
 	itterateWebsockets(func(ws *wsClient) {
-		err = ws.Con.WriteJSON(ws.NewSignal(shared.ListenTest, &c))
+		err = ws.Con.WriteJSON(ws.NewSignal(shared.ListenTest, c))
 		if err != nil {
 			return
 		}
@@ -319,7 +330,7 @@ func Stop(ctx context.Context, c shared.Config) (err error) {
 	}
 
 	itterateWebsockets(func(ws *wsClient) {
-		err = ws.Con.WriteJSON(ws.NewSignal(shared.StopAllTests, &c))
+		err = ws.Con.WriteJSON(ws.NewSignal(shared.StopAllTests, c))
 		if err != nil {
 			return
 		}
@@ -336,12 +347,16 @@ func RunTest(ctx context.Context, c shared.Config) (err error) {
 		return
 	}
 
+	ogh := slices.Clone(c.Hosts)
 	itterateWebsockets(func(ws *wsClient) {
-		err = ws.Con.WriteJSON(ws.NewSignal(shared.RunTest, &c))
+		oh := slices.Clone(ogh)
+		c.Hosts = filterSelf(oh, ws.Host)
+		err = ws.Con.WriteJSON(ws.NewSignal(shared.RunTest, c))
 		if err != nil {
 			return
 		}
 	})
+	c.Hosts = ogh
 
 	printCount := 0
 
@@ -432,7 +447,7 @@ func ListTests(ctx context.Context, c shared.Config) (err error) {
 	}
 
 	itterateWebsockets(func(ws *wsClient) {
-		err = ws.Con.WriteJSON(ws.NewSignal(shared.ListTests, &c))
+		err = ws.Con.WriteJSON(ws.NewSignal(shared.ListTests, c))
 		if err != nil {
 			return
 		}
@@ -480,7 +495,7 @@ func DeleteTests(ctx context.Context, c shared.Config) (err error) {
 	}
 
 	itterateWebsockets(func(ws *wsClient) {
-		err = ws.Con.WriteJSON(ws.NewSignal(shared.DeleteTests, &c))
+		err = ws.Con.WriteJSON(ws.NewSignal(shared.DeleteTests, c))
 		if err != nil {
 			return
 		}
@@ -510,7 +525,7 @@ func DownloadTest(ctx context.Context, c shared.Config) (err error) {
 	}
 
 	itterateWebsockets(func(ws *wsClient) {
-		err = ws.Con.WriteJSON(ws.NewSignal(shared.GetTest, &c))
+		err = ws.Con.WriteJSON(ws.NewSignal(shared.GetTest, c))
 		if err != nil {
 			fmt.Println(err)
 			return

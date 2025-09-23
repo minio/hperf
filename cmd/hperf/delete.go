@@ -53,7 +53,7 @@ EXAMPLES:
 func runDelete(ctx *cli.Context) error {
 	config, err := parseConfig(ctx)
 	if err != nil {
-		return err
+		return cli.NewExitError(err.Error(), 1)
 	}
 	return client.DeleteTests(GlobalContext, *config)
 }

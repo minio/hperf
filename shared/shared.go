@@ -40,7 +40,7 @@ type WebsocketSignal struct {
 
 	// Type specific fields
 	Data      []byte
-	Config    *Config
+	Config    Config
 	DataPoint *DataReponseToClient
 	TestList  []TestInfo
 }
