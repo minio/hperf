@@ -28,6 +28,7 @@ var listenCMD = cli.Command{
 	Action: runListen,
 	Flags: []cli.Flag{
 		dnsServerFlag,
+		ipFamilyFlag,
 		hostsFlag,
 		portFlag,
 		testIDFlag,

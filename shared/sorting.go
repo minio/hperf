@@ -2,7 +2,6 @@ package shared
 
 import (
 	"slices"
-	"strings"
 )
 
 type SortType string
@@ -13,12 +12,15 @@ const (
 	SortTTFBH   SortType = "TTFBH"
 )
 
+// HostFilter keeps the data points where host is either end of the measurement.
+// The comparison is per address and not a substring match, so filtering on
+// 10.0.0.1 does not also return 10.0.0.10.
 func HostFilter(host string, dps []DP) (filtered []DP) {
 	filtered = make([]DP, 0)
 	for _, v := range dps {
-		if strings.Contains(v.Local, host) {
+		if SameHost(HostOnly(v.Local), host) {
 			filtered = append(filtered, v)
-		} else if strings.Contains(v.Remote, host) {
+		} else if SameHost(HostOnly(v.Remote), host) {
 			filtered = append(filtered, v)
 		}
 	}

@@ -19,9 +19,7 @@ package client
 
 import (
 	"fmt"
-	"net"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -95,23 +93,16 @@ func initHeaders() {
 	headerSlice[HumanTime] = header{"Time", 30}
 }
 
-func hostColumnValue(addr string) string {
-	if host, _, err := net.SplitHostPort(addr); err == nil {
-		return host
-	}
-	return strings.Trim(addr, "[]")
-}
-
 func growHostColumns(dps []shared.DP) (grew bool) {
 	if headerSlice[0].width == 0 {
 		initHeaders()
 	}
 	for i := range dps {
-		if w := len(hostColumnValue(dps[i].Local)); w > headerSlice[Local].width {
+		if w := len(shared.HostOnly(dps[i].Local)); w > headerSlice[Local].width {
 			headerSlice[Local].width = w
 			grew = true
 		}
-		if w := len(hostColumnValue(dps[i].Remote)); w > headerSlice[Remote].width {
+		if w := len(shared.HostOnly(dps[i].Remote)); w > headerSlice[Remote].width {
 			headerSlice[Remote].width = w
 			grew = true
 		}
@@ -281,8 +272,8 @@ func printTableRow(style lipgloss.Style, entry *shared.DP, t shared.TestType) {
 		PrintColumns(
 			style,
 			column{entry.Created.Format("15:04:05"), headerSlice[Created].width},
-			column{hostColumnValue(entry.Local), headerSlice[Local].width},
-			column{hostColumnValue(entry.Remote), headerSlice[Remote].width},
+			column{shared.HostOnly(entry.Local), headerSlice[Local].width},
+			column{shared.HostOnly(entry.Remote), headerSlice[Remote].width},
 			column{shared.BWToString(entry.TX), headerSlice[TX].width},
 			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
 			column{formatInt(int64(entry.DroppedPackets)), headerSlice[DroppedPackets].width},
@@ -294,8 +285,8 @@ func printTableRow(style lipgloss.Style, entry *shared.DP, t shared.TestType) {
 		PrintColumns(
 			style,
 			column{entry.Created.Format("15:04:05"), headerSlice[Created].width},
-			column{hostColumnValue(entry.Local), headerSlice[Local].width},
-			column{hostColumnValue(entry.Remote), headerSlice[Remote].width},
+			column{shared.HostOnly(entry.Local), headerSlice[Local].width},
+			column{shared.HostOnly(entry.Remote), headerSlice[Remote].width},
 			column{formatInt(entry.RMSH), headerSlice[RMSH].width},
 			column{formatInt(entry.RMSL), headerSlice[RMSL].width},
 			column{formatInt(entry.TTFBH), headerSlice[TTFBH].width},
@@ -324,7 +315,7 @@ func collectDataPointv2(r *shared.DataReponseToClient) {
 	responseERR = append(responseERR, r.Errors...)
 }
 
-func praseDataPoint(r *shared.DataReponseToClient, c *shared.Config) {
+func printAndCollectDataPoints(r *shared.DataReponseToClient, c *shared.Config) {
 	if r == nil {
 		return
 	}

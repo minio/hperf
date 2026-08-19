@@ -19,11 +19,12 @@ package shared
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
-	"net/url"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -33,12 +34,6 @@ import (
 )
 
 var DebugEnabled = false
-
-// URLHostPort joins host and port for use inside a URL, percent-encoding the
-// zone delimiter of a scoped IPv6 address as RFC 6874 requires.
-func URLHostPort(host string, port string) string {
-	return net.JoinHostPort(url.PathEscape(host), port)
-}
 
 type WebsocketSignal struct {
 	SType SignalType
@@ -169,6 +164,7 @@ type Config struct {
 
 	// Client Only
 	ResolveHosts string   `json:"-"`
+	PrintLive    bool     `json:"-"`
 	PrintStats   bool     `json:"-"`
 	PrintAll     bool     `json:"-"`
 	PrintErrors  bool     `json:"-"`
@@ -229,8 +225,52 @@ func BWToString(b uint64) string {
 	return "???"
 }
 
-func ParseHosts(hosts string, dnsServer string) (list []string, err error) {
+// Address families accepted by the --ip-family flag.
+const (
+	IPFamilyAuto = "auto"
+	IPFamilyV4   = "4"
+	IPFamilyV6   = "6"
+)
+
+// lookupNetwork maps an --ip-family value to a net.Resolver network.
+func lookupNetwork(family string) (string, error) {
+	switch family {
+	case "", IPFamilyAuto:
+		return "ip", nil
+	case IPFamilyV4, "ipv4", "v4":
+		return "ip4", nil
+	case IPFamilyV6, "ipv6", "v6":
+		return "ip6", nil
+	default:
+		return "", fmt.Errorf("Unknown ip family (%s), use one of: auto, 4, 6", family)
+	}
+}
+
+// hostResolver returns a resolver that queries dnsServer, or the system
+// resolver when dnsServer is empty.
+func hostResolver(dnsServer string) *net.Resolver {
+	if dnsServer == "" {
+		return net.DefaultResolver
+	}
+	if _, _, err := net.SplitHostPort(dnsServer); err != nil {
+		dnsServer = net.JoinHostPort(NormalizeHost(dnsServer), "53")
+	}
+	return &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network string, _ string) (net.Conn, error) {
+			d := net.Dialer{Timeout: 5 * time.Second}
+			return d.DialContext(ctx, network, dnsServer)
+		},
+	}
+}
+
+func ParseHosts(hosts string, dnsServer string, family string) (list []string, err error) {
 	list = make([]string, 0)
+
+	network, err := lookupNetwork(family)
+	if err != nil {
+		return nil, err
+	}
 
 	if dnsServer != "" {
 		DEBUG("Using DNS server: ", dnsServer)
@@ -302,10 +342,34 @@ func ParseHosts(hosts string, dnsServer string) (list []string, err error) {
 
 	}
 
-	for i, host := range list {
-		if net.ParseIP(host) == nil && dnsServer != "" {
+	// Normalize before anything else looks at the entries: brackets around an
+	// IPv6 literal are dropped and addresses are canonicalized, so the client
+	// URL, the inter-server URLs and the self filters all see one spelling.
+	normalized := make([]string, 0, len(list))
+	for _, host := range list {
+		host = NormalizeHost(host)
+		if host == "" {
+			continue
+		}
+		normalized = append(normalized, host)
+	}
+	list = normalized
+
+	// Hostnames are only resolved up front when the caller asked for a
+	// specific DNS server or address family, otherwise they are handed to the
+	// dialer as they are.
+	if dnsServer != "" || network != "ip" {
+		resolver := hostResolver(dnsServer)
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		for i, host := range list {
+			if _, addrErr := netip.ParseAddr(host); addrErr == nil {
+				continue
+			}
+
 			var ips []net.IP
-			ips, err = net.LookupIP(host)
+			ips, err = resolver.LookupIP(ctx, network, host)
 			if err != nil {
 				return
 			}
@@ -314,8 +378,8 @@ func ParseHosts(hosts string, dnsServer string) (list []string, err error) {
 				return
 			}
 
-			list[i] = ips[0].String()
-			continue
+			list[i] = NormalizeHost(ips[0].String())
+			DEBUG("Resolved ", host, " to ", list[i])
 		}
 	}
 

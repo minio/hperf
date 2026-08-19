@@ -28,6 +28,7 @@ var statDownloadCMD = cli.Command{
 	Action: runDownload,
 	Flags: []cli.Flag{
 		dnsServerFlag,
+		ipFamilyFlag,
 		hostsFlag,
 		portFlag,
 		testIDFlag,

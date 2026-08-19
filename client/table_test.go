@@ -23,26 +23,6 @@ import (
 	"github.com/minio/hperf/shared"
 )
 
-func TestHostColumnValue(t *testing.T) {
-	cases := []struct {
-		addr     string
-		expected string
-	}{
-		{"10.10.1.2", "10.10.1.2"},
-		{"10.10.1.2:9010", "10.10.1.2"},
-		{"2607:6bc0:8107:432::1", "2607:6bc0:8107:432::1"},
-		{"[2607:6bc0:8107:432::1]:9010", "2607:6bc0:8107:432::1"},
-		{"[fe80::1%eth0]:9010", "fe80::1%eth0"},
-		{"node1.example.com:9010", "node1.example.com"},
-	}
-
-	for _, c := range cases {
-		if got := hostColumnValue(c.addr); got != c.expected {
-			t.Errorf("hostColumnValue(%q) = %q, expected %q", c.addr, got, c.expected)
-		}
-	}
-}
-
 func TestGrowHostColumns(t *testing.T) {
 	initHeaders()
 
