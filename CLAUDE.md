@@ -86,7 +86,7 @@ docker build -t hperf:latest .
 
 ## Development Notes
 
-- Go version: 1.24 (per go.mod)
+- Go version: 1.26 (per go.mod)
 - Uses Fiber v2 for HTTP/WebSocket server
 - WebSocket library: gofiber/contrib/websocket (server) and fasthttp/websocket (client)
 - System metrics: shirou/gopsutil for CPU/memory stats
