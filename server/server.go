@@ -28,6 +28,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -227,17 +228,22 @@ func startAPIandWS(ctx context.Context) (err error) {
 		return c.SendStatus(200)
 	})
 
+	// A failed bind has to end the process, otherwise the server keeps running
+	// without a listener and looks healthy while refusing every connection.
+	listenErr := make(chan error, 1)
 	go func() {
-		err = httpServer.Listen(bindAddress)
-		if err != nil {
-			fmt.Println(err)
-		}
+		listenErr <- httpServer.Listen(bindAddress)
 	}()
 
 	routineMonitor <- 1
 
 	for {
 		select {
+		case lerr := <-listenErr:
+			if lerr != nil {
+				return fmt.Errorf("unable to listen on %s: %w", bindAddress, lerr)
+			}
+			return nil
 		case id := <-routineMonitor:
 			if id == 1 {
 				go getServerStats(id)
@@ -362,6 +368,27 @@ func SendDone(c *websocket.Conn) error {
 	return c.WriteJSON(msg)
 }
 
+// isSelfHost reports whether host points back at this server. Addresses are
+// compared as addresses and not as substrings, so --real-ip 10.0.0.1 no longer
+// swallows the peer 10.0.0.10 and --real-ip fd00::1 no longer swallows
+// fd00::10.
+func isSelfHost(host string) bool {
+	if realIP != "" && shared.SameHost(host, realIP) {
+		return true
+	}
+
+	bindHost := shared.HostOnly(bindAddress)
+	if bindHost == "" {
+		return false
+	}
+	// A wildcard bind says nothing about our own identity, that is what
+	// --real-ip is for.
+	if addr, err := netip.ParseAddr(bindHost); err == nil && addr.IsUnspecified() {
+		return false
+	}
+	return shared.SameHost(host, bindHost)
+}
+
 func newTest(c shared.Config) (t *test, err error) {
 	testLock.Lock()
 	defer testLock.Unlock()
@@ -385,11 +412,8 @@ func newTest(c shared.Config) (t *test, err error) {
 
 	for i := range c.Hosts {
 
-		joinedHostPort := net.JoinHostPort(c.Hosts[i], c.Port)
-		if realIP != "" && strings.Contains(joinedHostPort, realIP) {
-			continue
-		}
-		if joinedHostPort == bindAddress {
+		if isSelfHost(c.Hosts[i]) {
+			shared.DEBUG("Skipping self:", c.Hosts[i])
 			continue
 		}
 		t.Readers = append(t.Readers,
