@@ -1,0 +1,67 @@
+# Linux only release configuration, used by .github/workflows/release.yml when a
+# tag is pushed. It publishes the linux binaries and the deb/rpm packages to the
+# GitHub release.
+#
+# It deliberately leaves out the parts of .goreleaser.yml that need a workstation:
+# minisign signatures (the key lives on a locally mounted path) and the quay.io
+# images (they need buildx and a registry login). Run the full .goreleaser.yml
+# by hand for those.
+version: 2
+
+project_name: hperf
+
+release:
+  name_template: "Release version {{.Version}}"
+
+  github:
+    owner: minio
+    name: hperf
+
+  # A hand run of .goreleaser.yml for the same tag adds its artifacts to this
+  # release instead of failing on it.
+  mode: append
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  -
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - ppc64le
+      - s390x
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+      - --tags=kqueue
+    ldflags:
+      - "-s -w -X main.version={{.Version}}"
+    main: ./cmd/hperf
+
+archives:
+  -
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+    formats:
+      - binary
+
+nfpms:
+  -
+    vendor: MinIO, Inc.
+    homepage: https://github.com/minio/hperf
+    maintainer: MinIO Development <dev@min.io>
+    description: Nperf tool performs N peers to N peers cross network benchmark measuring RX/TX bandwidth for each peers
+    license: GNU Affero General Public License v3.0
+    formats:
+      - deb
+      - rpm
+
+snapshot:
+  version_template: v0.0.0@{{.ShortCommit}}
+
+changelog:
+  sort: asc
