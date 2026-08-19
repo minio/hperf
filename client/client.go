@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net"
 	"net/http"
 	"os"
 	"reflect"
@@ -180,10 +181,11 @@ func handleWSConnection(ctx context.Context, c *shared.Config, host string, id i
 
 	shared.DEBUG(WarningStyle.Render("Connecting to ", host, ":", c.Port))
 
-	connectString := "wss://" + host + ":" + c.Port + "/ws/" + host
+	scheme := "wss"
 	if c.Insecure {
-		connectString = "ws://" + host + ":" + c.Port + "/ws/" + host
+		scheme = "ws"
 	}
+	connectString := scheme + "://" + net.JoinHostPort(host, c.Port) + "/ws/" + host
 
 	con, _, dialErr := dialer.DialContext(
 		ctx,
@@ -843,6 +845,8 @@ func printSliceOfDataPoints(dps []shared.DP, c shared.Config) {
 	} else {
 		data = dps
 	}
+
+	growHostColumns(data)
 
 	for i := range data {
 		if i%20 == 0 {

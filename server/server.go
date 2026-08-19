@@ -47,6 +47,7 @@ import (
 
 var (
 	httpServer = fiber.New(fiber.Config{
+		Network:               fiber.NetworkTCP,
 		StreamRequestBody:     true,
 		ServerHeader:          "hperf",
 		AppName:               "hperf",
