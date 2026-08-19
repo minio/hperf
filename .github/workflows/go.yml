@@ -1,0 +1,36 @@
+name: Go
+on:
+  pull_request:
+    branches:
+    - master
+    - main
+  push:
+    branches:
+    - master
+    - main
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: [ 1.26.x ]
+    steps:
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+        check-latest: true
+    - name: Check formatting
+      run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      shell: bash
+    - name: Build
+      run: go build ./...
+      shell: bash
+    - name: Vet
+      run: go vet ./...
+      shell: bash
+    - name: Test
+      run: go test -race ./...
+      shell: bash

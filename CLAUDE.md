@@ -64,7 +64,9 @@ docker build -t hperf:latest .
 
 ### Critical Implementation Details
 
-**Server IP handling**: Servers need `--real-ip` flag when `--address` differs from external IP. Without this, servers report internal IPs in stats and may test against themselves (server/server.go:388-390).
+**Server IP handling**: Servers need `--real-ip` flag when `--address` differs from external IP (or is a wildcard). Without this, servers report the bind address in stats and cannot recognize themselves in the host list (`isSelfHost` in server/server.go).
+
+**Address handling**: All host entries pass through `shared.NormalizeHost` in `ParseHosts`, which strips brackets and canonicalizes IP literals, so one spelling reaches the wire, the self filters and the output. Use `shared.URLHostPort` when building a URL (it percent-encodes an IPv6 zone as RFC 6874 requires), `shared.HostOnly` to drop a port for display, and `shared.SameHost` to compare hosts - never substring matching, which used to make `--real-ip 10.0.0.1` swallow the peer `10.0.0.10`. The server binds with `fiber.NetworkTCP`, so a wildcard bind is dual-stack.
 
 **Data persistence**: Test results are saved to `--storage-path` (default: current directory + `/hperf-tests/`). Each data point is JSON with a prefix byte (0=DataPoint, 1=ErrorPoint) followed by newline. Files are named by test ID.
 
@@ -83,6 +85,8 @@ docker build -t hperf:latest .
 - `--payload-size`: HTTP payload size in bytes (default: 1000000)
 - `--request-delay`: Delay between requests in milliseconds (default: 0)
 - `--save`: Save test results on server for later retrieval (default: true)
+- `--ip-family`: Address family used when resolving hostnames in `--hosts`: `auto`, `4` or `6` (default: auto)
+- `--dns-server`: Resolve hostnames in `--hosts` through this DNS server
 
 ## Development Notes
 
@@ -91,7 +95,7 @@ docker build -t hperf:latest .
 - WebSocket library: gofiber/contrib/websocket (server) and fasthttp/websocket (client)
 - System metrics: shirou/gopsutil for CPU/memory stats
 - UI: charmbracelet/lipgloss for terminal styling
-- The codebase filters servers from testing themselves: see client/client.go:78-87 and server/server.go:386-399
+- The codebase filters servers from testing themselves: see `filterSelf` in client/client.go and `isSelfHost` in server/server.go
 
 ## Helm Deployment
 
