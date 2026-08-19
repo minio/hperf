@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -78,7 +79,7 @@ func (c *wsClient) Remove() (err error) {
 
 func filterSelf(hosts []string, self string) []string {
 	for i, v := range hosts {
-		if v == self {
+		if shared.SameHost(v, self) {
 			hosts = slices.Delete(hosts, i, i+1)
 			break
 		}
@@ -179,7 +180,7 @@ func handleWSConnection(ctx context.Context, c *shared.Config, host string, id i
 		WriteBufferSize:  1000000,
 	}
 
-	shared.DEBUG(WarningStyle.Render("Connecting to ", host, ":", c.Port))
+	shared.DEBUG(WarningStyle.Render("Connecting to ", net.JoinHostPort(host, c.Port)))
 
 	scheme := "wss"
 	if c.Insecure {
@@ -210,7 +211,7 @@ func handleWSConnection(ctx context.Context, c *shared.Config, host string, id i
 		PrintError(err)
 		return
 	}
-	shared.DEBUG(SuccessStyle.Render("Connected to ", host, ":", c.Port))
+	shared.DEBUG(SuccessStyle.Render("Connected to ", net.JoinHostPort(host, c.Port)))
 
 	done <- struct{}{}
 	for {
@@ -225,7 +226,13 @@ func handleWSConnection(ctx context.Context, c *shared.Config, host string, id i
 		}
 		switch signal.SType {
 		case shared.Stats:
-			go collectDataPointv2(signal.DataPoint)
+			// Live tests print an aggregate table of their own, attached
+			// clients print the incoming data points as they arrive.
+			if c.PrintLive {
+				go printAndCollectDataPoints(signal.DataPoint, c)
+			} else {
+				go collectDataPointv2(signal.DataPoint)
+			}
 		case shared.ListTests:
 			go parseTestList(signal.TestList)
 		case shared.GetTest:
@@ -308,6 +315,7 @@ func keepAliveLoop(ctx context.Context, c *shared.Config, tickerfunc func() (sho
 func Listen(ctx context.Context, c shared.Config) (err error) {
 	cancelContext, cancel := context.WithCancel(ctx)
 	defer cancel()
+	c.PrintLive = true
 	err = initializeClient(cancelContext, &c)
 	if err != nil {
 		return
