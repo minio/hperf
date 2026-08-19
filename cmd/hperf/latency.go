@@ -36,6 +36,7 @@ var latency = cli.Command{
 		testIDFlag,
 		saveTestFlag,
 		dnsServerFlag,
+		ipFamilyFlag,
 		microSecondsFlag,
 		printAllFlag,
 	},

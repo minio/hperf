@@ -28,6 +28,7 @@ var analyzeCMD = cli.Command{
 	Action: runAnalyze,
 	Flags: []cli.Flag{
 		dnsServerFlag,
+		ipFamilyFlag,
 		hostsFlag,
 		portFlag,
 		fileFlag,

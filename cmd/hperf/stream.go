@@ -37,6 +37,7 @@ var streamCMD = cli.Command{
 		payloadSizeFlag,
 		restartOnErrorFlag,
 		dnsServerFlag,
+		ipFamilyFlag,
 		saveTestFlag,
 	},
 	CustomHelpTemplate: `NAME:

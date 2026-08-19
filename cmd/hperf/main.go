@@ -76,6 +76,7 @@ var (
 		testIDFlag,
 		saveTestFlag,
 		dnsServerFlag,
+		ipFamilyFlag,
 	}
 	hostsFlag = cli.StringFlag{
 		Name:   "hosts",
@@ -150,6 +151,12 @@ var (
 		Name:   "dns-server",
 		EnvVar: "HPERF_DNS_SERVER",
 		Usage:  "use a custom DNS server to resolve hosts",
+	}
+	ipFamilyFlag = cli.StringFlag{
+		Name:   "ip-family",
+		EnvVar: "HPERF_IP_FAMILY",
+		Value:  shared.IPFamilyAuto,
+		Usage:  "address family used when resolving hostnames: auto, 4 or 6",
 	}
 	printStatsFlag = cli.BoolFlag{
 		Name:  "print-stats",
@@ -255,6 +262,7 @@ func parseConfig(ctx *cli.Context) (*shared.Config, error) {
 	hosts, err := shared.ParseHosts(
 		ctx.String(hostsFlag.Name),
 		ctx.String(dnsServerFlag.Name),
+		ctx.String(ipFamilyFlag.Name),
 	)
 	if err != nil {
 		goto Error

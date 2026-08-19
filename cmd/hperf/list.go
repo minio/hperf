@@ -28,6 +28,7 @@ var listTestsCMD = cli.Command{
 	Action: runList,
 	Flags: []cli.Flag{
 		dnsServerFlag,
+		ipFamilyFlag,
 		hostsFlag,
 		portFlag,
 		testIDFlag,

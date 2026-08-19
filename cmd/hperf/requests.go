@@ -39,6 +39,7 @@ var requestsCMD = cli.Command{
 		testIDFlag,
 		saveTestFlag,
 		dnsServerFlag,
+		ipFamilyFlag,
 		microSecondsFlag,
 	},
 	CustomHelpTemplate: `NAME:

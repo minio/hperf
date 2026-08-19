@@ -28,6 +28,7 @@ var deleteCMD = cli.Command{
 	Action: runDelete,
 	Flags: []cli.Flag{
 		dnsServerFlag,
+		ipFamilyFlag,
 		hostsFlag,
 		portFlag,
 		testIDFlag,

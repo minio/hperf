@@ -37,6 +37,7 @@ var bandwidthCMD = cli.Command{
 		testIDFlag,
 		concurrencyFlag,
 		dnsServerFlag,
+		ipFamilyFlag,
 		microSecondsFlag,
 		printAllFlag,
 	},

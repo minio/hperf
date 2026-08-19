@@ -20,7 +20,6 @@ package client
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -92,6 +91,23 @@ func initHeaders() {
 	headerSlice[CPULow] = header{"CPU(low)", 9}
 	headerSlice[ID] = header{"ID", 30}
 	headerSlice[HumanTime] = header{"Time", 30}
+}
+
+func growHostColumns(dps []shared.DP) (grew bool) {
+	if headerSlice[0].width == 0 {
+		initHeaders()
+	}
+	for i := range dps {
+		if w := len(shared.HostOnly(dps[i].Local)); w > headerSlice[Local].width {
+			headerSlice[Local].width = w
+			grew = true
+		}
+		if w := len(shared.HostOnly(dps[i].Remote)); w > headerSlice[Remote].width {
+			headerSlice[Remote].width = w
+			grew = true
+		}
+	}
+	return
 }
 
 func GenerateFormatString(columnCount int) (fs string) {
@@ -256,8 +272,8 @@ func printTableRow(style lipgloss.Style, entry *shared.DP, t shared.TestType) {
 		PrintColumns(
 			style,
 			column{entry.Created.Format("15:04:05"), headerSlice[Created].width},
-			column{strings.Split(entry.Local, ":")[0], headerSlice[Local].width},
-			column{strings.Split(entry.Remote, ":")[0], headerSlice[Remote].width},
+			column{shared.HostOnly(entry.Local), headerSlice[Local].width},
+			column{shared.HostOnly(entry.Remote), headerSlice[Remote].width},
 			column{shared.BWToString(entry.TX), headerSlice[TX].width},
 			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
 			column{formatInt(int64(entry.DroppedPackets)), headerSlice[DroppedPackets].width},
@@ -269,8 +285,8 @@ func printTableRow(style lipgloss.Style, entry *shared.DP, t shared.TestType) {
 		PrintColumns(
 			style,
 			column{entry.Created.Format("15:04:05"), headerSlice[Created].width},
-			column{strings.Split(entry.Local, ":")[0], headerSlice[Local].width},
-			column{strings.Split(entry.Remote, ":")[0], headerSlice[Remote].width},
+			column{shared.HostOnly(entry.Local), headerSlice[Local].width},
+			column{shared.HostOnly(entry.Remote), headerSlice[Remote].width},
 			column{formatInt(entry.RMSH), headerSlice[RMSH].width},
 			column{formatInt(entry.RMSL), headerSlice[RMSL].width},
 			column{formatInt(entry.TTFBH), headerSlice[TTFBH].width},
@@ -299,7 +315,7 @@ func collectDataPointv2(r *shared.DataReponseToClient) {
 	responseERR = append(responseERR, r.Errors...)
 }
 
-func praseDataPoint(r *shared.DataReponseToClient, c *shared.Config) {
+func printAndCollectDataPoints(r *shared.DataReponseToClient, c *shared.Config) {
 	if r == nil {
 		return
 	}
@@ -312,8 +328,9 @@ func praseDataPoint(r *shared.DataReponseToClient, c *shared.Config) {
 	if len(r.DPS) > 0 {
 		c.TestType = r.DPS[0].Type
 	}
+	grew := growHostColumns(r.DPS)
 	if len(responseDPS) > 0 {
-		if len(responseDPS)%10 == 0 {
+		if grew || len(responseDPS)%10 == 0 {
 			printDataPointHeaders(c.TestType)
 		}
 	} else {

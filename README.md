@@ -105,6 +105,42 @@ hperf supports flexible host specification:
 ./hperf latency --hosts file:/home/user/hosts.txt
 ```
 
+### IPv6
+
+IPv6 works everywhere IPv4 does. Addresses are accepted with or without
+brackets and are canonicalized internally, so `2001:db8::1`, `[2001:db8::1]`
+and `2001:0db8:0000:0000:0000:0000:0000:0001` all refer to the same host:
+
+```bash
+# IPv6 literals, ellipsis patterns and scoped link-local addresses
+./hperf latency --hosts 2001:db8::1,2001:db8::2
+./hperf latency --hosts 2001:db8::{1...10}
+./hperf latency --hosts fe80::1%eth0,fe80::2%eth0
+```
+
+Servers need a listener on an IPv6 address:
+
+```bash
+# Dual-stack: accepts IPv4 and IPv6 on every interface
+./hperf server --address '[::]:9010'
+
+# A single IPv6 address, with the same address reported in results
+./hperf server --address '[2001:db8::1]:9010' --real-ip 2001:db8::1
+```
+
+Note that a wildcard bind (`0.0.0.0:9010` or `[::]:9010`, including the
+default) listens for both address families. Bind a specific address if you
+need to restrict the server to one family. The server API is unauthenticated,
+so this matters when the port is reachable from untrusted networks.
+
+When `--hosts` contains hostnames, `--ip-family` picks the address family they
+resolve to (`auto`, `4` or `6`), and `--dns-server` resolves them through a
+specific DNS server:
+
+```bash
+./hperf latency --hosts node{1...4}.example.com --ip-family 6
+```
+
 ## Understanding Test Results
 
 ### Real-Time Output
@@ -213,6 +249,8 @@ Find optimal buffer/payload sizes for your workload:
 | `--request-delay` | 0              | Delay between requests in milliseconds                       |
 | `--save`          | true           | Save test results on servers                                 |
 | `--insecure`      | false          | Use HTTP instead of HTTPS                                    |
+| `--dns-server`    | (system)       | DNS server used to resolve hostnames in `--hosts`            |
+| `--ip-family`     | auto           | Address family for hostname resolution: `auto`, `4` or `6`   |
 | `--debug`         | false          | Enable debug output                                          |
 
 ### Environment Variables
@@ -270,6 +308,10 @@ docker run -p 9010:9010 minio/hperf:latest server --address 0.0.0.0:9010
 ### Servers testing themselves
 **Symptom**: Unusually high throughput or low latency results
 **Solution**: Ensure `--real-ip` matches the external IP used for inter-server communication
+
+### Server exits with "unable to listen on ..."
+**Symptom**: The server stops right after start
+**Solution**: The bind address is not usable on this host. `--address '[::]:9010'` is the dual-stack wildcard; an IPv6 literal has to be bracketed (`'[2001:db8::1]:9010'`)
 
 ### No data points received
 **Symptom**: Client shows no statistics during test

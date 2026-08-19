@@ -28,6 +28,7 @@ var stopCMD = cli.Command{
 	Action: runStop,
 	Flags: []cli.Flag{
 		dnsServerFlag,
+		ipFamilyFlag,
 		hostsFlag,
 		portFlag,
 		testIDFlag,

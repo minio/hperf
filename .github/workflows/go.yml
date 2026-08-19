@@ -1,4 +1,4 @@
-name: VulnCheck
+name: Go
 on:
   pull_request:
     branches:
@@ -9,8 +9,8 @@ on:
     - master
     - main
 jobs:
-  vulncheck:
-    name: Analysis
+  build:
+    name: Build and test
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -22,9 +22,15 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
         check-latest: true
-    - name: Get govulncheck
-      run: go install golang.org/x/vuln/cmd/govulncheck@latest
+    - name: Check formatting
+      run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
       shell: bash
-    - name: Run govulncheck
-      run: govulncheck ./...
+    - name: Build
+      run: go build ./...
+      shell: bash
+    - name: Vet
+      run: go vet ./...
+      shell: bash
+    - name: Test
+      run: go test -race ./...
       shell: bash
