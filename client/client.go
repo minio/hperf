@@ -26,8 +26,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"runtime/debug"
@@ -185,7 +185,7 @@ func handleWSConnection(ctx context.Context, c *shared.Config, host string, id i
 	if c.Insecure {
 		scheme = "ws"
 	}
-	connectString := scheme + "://" + net.JoinHostPort(host, c.Port) + "/ws/" + host
+	connectString := scheme + "://" + shared.URLHostPort(host, c.Port) + "/ws/" + url.PathEscape(host)
 
 	con, _, dialErr := dialer.DialContext(
 		ctx,

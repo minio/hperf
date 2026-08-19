@@ -102,18 +102,21 @@ func hostColumnValue(addr string) string {
 	return strings.Trim(addr, "[]")
 }
 
-func growHostColumns(dps []shared.DP) {
+func growHostColumns(dps []shared.DP) (grew bool) {
 	if headerSlice[0].width == 0 {
 		initHeaders()
 	}
 	for i := range dps {
 		if w := len(hostColumnValue(dps[i].Local)); w > headerSlice[Local].width {
 			headerSlice[Local].width = w
+			grew = true
 		}
 		if w := len(hostColumnValue(dps[i].Remote)); w > headerSlice[Remote].width {
 			headerSlice[Remote].width = w
+			grew = true
 		}
 	}
+	return
 }
 
 func GenerateFormatString(columnCount int) (fs string) {
@@ -334,9 +337,9 @@ func praseDataPoint(r *shared.DataReponseToClient, c *shared.Config) {
 	if len(r.DPS) > 0 {
 		c.TestType = r.DPS[0].Type
 	}
-	growHostColumns(r.DPS)
+	grew := growHostColumns(r.DPS)
 	if len(responseDPS) > 0 {
-		if len(responseDPS)%10 == 0 {
+		if grew || len(responseDPS)%10 == 0 {
 			printDataPointHeaders(c.TestType)
 		}
 	} else {

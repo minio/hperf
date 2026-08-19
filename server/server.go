@@ -414,6 +414,7 @@ type netPerfReader struct {
 	buf []byte
 
 	addr   string
+	url    string
 	ip     string
 	client *http.Client
 
@@ -691,6 +692,7 @@ func newPerformanceReaderForASingleHost(c shared.Config, host string, port strin
 	r = new(netPerfReader)
 	r.lastDataPointTime = time.Now()
 	r.addr = net.JoinHostPort(host, port)
+	r.url = shared.URLHostPort(host, port)
 	r.ip = host
 	r.buf = make([]byte, c.PayloadSize)
 	r.TTFBL = math.MaxInt64
@@ -772,7 +774,7 @@ func sendRequestToHost(t *test, r *netPerfReader, cid int) {
 	req, err = http.NewRequestWithContext(
 		t.ctx,
 		method,
-		proto+r.addr+route,
+		proto+r.url+route,
 		body,
 	)
 	if err != nil {

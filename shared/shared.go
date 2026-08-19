@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -32,6 +33,12 @@ import (
 )
 
 var DebugEnabled = false
+
+// URLHostPort joins host and port for use inside a URL, percent-encoding the
+// zone delimiter of a scoped IPv6 address as RFC 6874 requires.
+func URLHostPort(host string, port string) string {
+	return net.JoinHostPort(url.PathEscape(host), port)
+}
 
 type WebsocketSignal struct {
 	SType SignalType
