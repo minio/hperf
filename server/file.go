@@ -19,66 +19,110 @@ package server
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/gofiber/contrib/websocket"
 	"github.com/minio/hperf/shared"
 )
 
-func streamTestFilesToWebsocket(con *websocket.Conn, testID string) (err error) {
+// testGlob builds the pattern matching one test's files.
+//
+// Read and delete paths deliberately do NOT apply shared.ValidateTestID: files
+// already on disk may have been written by an older server under no rules at
+// all, and rejecting them here would leave a long-lived server pod listing
+// tests it then refuses to serve or remove. The property that actually matters
+// is that the pattern cannot escape the storage directory, which is what this
+// checks. ValidateTestID still governs IDs that become NEW paths, in newTest.
+func testGlob(id string) (string, error) {
+	if id == "" {
+		return "", errors.New("test id is empty")
+	}
+	base := filepath.Clean(basePath)
+	pattern := filepath.Join(base, id+".*")
+	// Join cleans its result, so an id carrying a separator or ".." moves the
+	// pattern out of the storage directory and its parent stops being base.
+	if filepath.Dir(pattern) != base {
+		return "", fmt.Errorf("invalid test id (%s)", id)
+	}
+	return pattern, nil
+}
+
+func streamTestFilesToWebsocket(p *wsPeer, testID string) (err error) {
+	pattern, err := testGlob(testID)
+	if err != nil {
+		return err
+	}
+
 	var files []string
-	files, err = filepath.Glob(filepath.Join(basePath, testID+".*"))
+	files, err = filepath.Glob(pattern)
 	if err != nil {
 		return
 	}
 	msg := new(shared.WebsocketSignal)
 	for _, path := range files {
-		f, err := os.Open(path)
-		if err != nil {
+		if err = streamOneTestFile(p, msg, path); err != nil {
 			return err
-		}
-		s := bufio.NewScanner(f)
-		for s.Scan() {
-			msg.Data = s.Bytes()
-			msg.SType = shared.GetTest
-			msg.Code = 200
-			err = con.WriteJSON(msg)
-			if err != nil {
-				return err
-			}
-		}
-		if s.Err() != nil {
-			return s.Err()
 		}
 	}
 
 	return nil
 }
 
-func deleteTestsFromDisk(con *websocket.Conn, signal shared.WebsocketSignal) (err error) {
-	defer SendDone(con)
+// streamOneTestFile is a separate function so the file is closed when it
+// returns. Opening inside the caller's loop leaked one descriptor per file per
+// download, for the lifetime of the server, and every error return leaked too.
+func streamOneTestFile(p *wsPeer, msg *shared.WebsocketSignal, path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 
-	if signal.Config.TestID == "" {
-		err = os.RemoveAll(basePath)
-		if err != nil {
-			SendError(con, err)
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		msg.Data = s.Bytes()
+		msg.SType = shared.GetTest
+		msg.Code = 200
+		if err := p.writeJSON(msg); err != nil {
+			return err
 		}
+	}
+	return s.Err()
+}
+
+func deleteTestsFromDisk(p *wsPeer, signal shared.WebsocketSignal) (err error) {
+	defer SendDone(p)
+
+	// An empty ID means "delete every test", which is what `hperf delete`
+	// without --id asks for. It has to return here: falling through would glob
+	// ".*" against a directory that no longer exists.
+	if signal.Config.TestID == "" {
+		if err = os.RemoveAll(basePath); err != nil {
+			SendError(p, err)
+		}
+		return
+	}
+
+	pattern, err := testGlob(signal.Config.TestID)
+	if err != nil {
+		SendError(p, err)
+		return
 	}
 
 	var files []string
-	files, err = filepath.Glob(filepath.Join(basePath, signal.Config.TestID+".*"))
+	files, err = filepath.Glob(pattern)
 	if err != nil {
-		SendError(con, err)
+		SendError(p, err)
 		return
 	}
 
 	for _, path := range files {
-		err = os.Remove(path)
-		if err != nil {
-			SendError(con, err)
+		if err = os.Remove(path); err != nil {
+			SendError(p, err)
 		}
 	}
 
@@ -110,8 +154,15 @@ func listTestsFromDisk() (finalList []shared.TestInfo, err error) {
 }
 
 func resetTestFiles(t *test) (err error) {
+	if err = shared.ValidateTestID(t.ID); err != nil {
+		return
+	}
+
+	// The pattern is anchored with the separator. Without it, "--id test"
+	// matched -- and deleted -- test2.1, testing.1 and every other test whose
+	// ID merely started with "test", and an empty ID matched everything.
 	var files []string
-	files, err = filepath.Glob(filepath.Join(basePath, t.ID+"*"))
+	files, err = filepath.Glob(filepath.Join(basePath, t.ID+".*"))
 	if err != nil {
 		return
 	}

@@ -32,7 +32,7 @@ type header struct {
 }
 
 type column struct {
-	value interface{}
+	value any
 	width int
 }
 
@@ -52,6 +52,7 @@ const (
 	TX
 	TXH
 	TXL
+	TXA
 	TXT
 	TXCount
 	ErrCount
@@ -64,8 +65,17 @@ const (
 	CPULow
 	ID
 	HumanTime
+	Samples
 	header_length
 )
+
+// Headers are built once at package init. They used to be built lazily on the
+// first data point, from whichever goroutine got there first, while the live
+// ticker goroutine was already reading widths -- a race, and one that produced
+// an unpadded row if a tick landed before any data point.
+func init() {
+	initHeaders()
+}
 
 func initHeaders() {
 	headerSlice[IntNumber] = header{"#", 5}
@@ -76,9 +86,13 @@ func initHeaders() {
 	headerSlice[RMSL] = header{"RMS(low)", 9}
 	headerSlice[TTFBH] = header{"TTFB(high)", 9}
 	headerSlice[TTFBL] = header{"TTFB(low)", 9}
-	headerSlice[TX] = header{"TX", 10}
-	headerSlice[TXL] = header{"TX(low)", 10}
-	headerSlice[TXH] = header{"TX(high)", 10}
+	// BWToString emits up to 11 characters ("999.99 GB/s") and PrintColumns
+	// pads but never truncates, so a width of 10 shifted every later column
+	// right once a test reached GB/s.
+	headerSlice[TX] = header{"TX", 11}
+	headerSlice[TXL] = header{"TX(min)", 11}
+	headerSlice[TXH] = header{"TX(max)", 11}
+	headerSlice[TXA] = header{"TX(avg)", 11}
 	headerSlice[TXT] = header{"TX(total)", 15}
 	headerSlice[TXCount] = header{"#TX", 10}
 	headerSlice[ErrCount] = header{"#ERR", 6}
@@ -91,12 +105,14 @@ func initHeaders() {
 	headerSlice[CPULow] = header{"CPU(low)", 9}
 	headerSlice[ID] = header{"ID", 30}
 	headerSlice[HumanTime] = header{"Time", 30}
+	headerSlice[Samples] = header{"#Samples", 9}
 }
 
+// growHostColumns widens the two host columns to fit the addresses seen so
+// far. Callers must hold responseLock: these are the only header entries that
+// change after init, and the per-data-point table is rendered from the same
+// lock-holding paths.
 func growHostColumns(dps []shared.DP) (grew bool) {
-	if headerSlice[0].width == 0 {
-		initHeaders()
-	}
 	for i := range dps {
 		if w := len(shared.HostOnly(dps[i].Local)); w > headerSlice[Local].width {
 			headerSlice[Local].width = w
@@ -123,8 +139,10 @@ var (
 	LatencyHeaders       = []HeaderField{Created, Local, Remote, RMSH, RMSL, TTFBH, TTFBL, TX, TXCount, ErrCount, DroppedPackets, MemoryUsage, CPUUsage}
 	FullDataPointHeaders = []HeaderField{Created, Local, Remote, RMSH, RMSL, TTFBH, TTFBL, TX, TXCount, ErrCount, DroppedPackets, MemoryUsage, CPUUsage}
 
-	RealTimeBandwidthHeaders = []HeaderField{ErrCount, TXCount, TXH, TXL, TXT, DroppedPackets, MemoryHigh, MemoryLow, CPUHigh, CPULow}
-	RealTimeLatencyHeaders   = []HeaderField{ErrCount, TXCount, TXH, TXL, TXT, RMSH, RMSL, TTFBH, TTFBL, DroppedPackets, MemoryHigh, MemoryLow, CPUHigh, CPULow}
+	// TX(avg) is inserted next to the existing extremes; every other column
+	// keeps its position so the live output stays recognizable.
+	RealTimeBandwidthHeaders = []HeaderField{ErrCount, TXCount, TXH, TXL, TXA, TXT, DroppedPackets, MemoryHigh, MemoryLow, CPUHigh, CPULow}
+	RealTimeLatencyHeaders   = []HeaderField{ErrCount, TXCount, TXH, TXL, TXA, TXT, RMSH, RMSL, TTFBH, TTFBL, DroppedPackets, MemoryHigh, MemoryLow, CPUHigh, CPULow}
 )
 
 var (
@@ -136,11 +154,8 @@ var (
 )
 
 func printHeader(fields []HeaderField) {
-	if headerSlice[0].width == 0 {
-		initHeaders()
-	}
 	fs := GenerateFormatString(len(fields))
-	hs := make([]interface{}, 0)
+	hs := make([]any, 0)
 	for i := range fields {
 		h := headerSlice[fields[i]]
 		hs = append(hs, h.width, h.label)
@@ -151,7 +166,7 @@ func printHeader(fields []HeaderField) {
 
 func PrintPercentilesHeader(style lipgloss.Style, tag string, dps []int64, c shared.Config) {
 	fs := GenerateFormatString(6)
-	hs := []interface{}{
+	hs := []any{
 		4, tag,
 		10, "count",
 		10, "sum",
@@ -167,7 +182,7 @@ func PrintPercentilesHeader(style lipgloss.Style, tag string, dps []int64, c sha
 func PrintPercentiles(style lipgloss.Style, tag string, dps []int64, c shared.Config) {
 	PrintPercentilesHeader(style, tag, dps, c)
 	fs := GenerateFormatString(6)
-	hs := make([]interface{}, 12)
+	hs := make([]any, 12)
 	hs[0] = 4
 	hs[1] = ""
 	hs[2] = 10
@@ -196,7 +211,7 @@ func PrintPercentiles(style lipgloss.Style, tag string, dps []int64, c shared.Co
 
 func PrintColumns(style lipgloss.Style, columns ...column) {
 	fs := GenerateFormatString(len(columns))
-	hs := make([]interface{}, 0)
+	hs := make([]any, 0)
 	for i := range columns {
 		hs = append(hs, columns[i].width, columns[i].value)
 	}
@@ -235,6 +250,7 @@ func printRealTimeRow(style lipgloss.Style, entry *shared.TestOutput, t shared.T
 			column{formatUint(entry.TXC), headerSlice[TXCount].width},
 			column{shared.BWToString(entry.TXH), headerSlice[TXH].width},
 			column{shared.BWToString(entry.TXL), headerSlice[TXL].width},
+			column{shared.BWToString(entry.TXA), headerSlice[TXA].width},
 			column{shared.BToString(entry.TXT), headerSlice[TXT].width},
 			column{formatInt(int64(entry.DP)), headerSlice[DroppedPackets].width},
 			column{formatInt(int64(entry.MH)), headerSlice[MemoryHigh].width},
@@ -250,6 +266,7 @@ func printRealTimeRow(style lipgloss.Style, entry *shared.TestOutput, t shared.T
 			column{formatUint(entry.TXC), headerSlice[TXCount].width},
 			column{shared.BWToString(entry.TXH), headerSlice[TXH].width},
 			column{shared.BWToString(entry.TXL), headerSlice[TXL].width},
+			column{shared.BWToString(entry.TXA), headerSlice[TXA].width},
 			column{shared.BToString(entry.TXT), headerSlice[TXT].width},
 			column{formatInt(entry.RMSH), headerSlice[RMSH].width},
 			column{formatInt(entry.RMSL), headerSlice[RMSL].width},
@@ -290,7 +307,7 @@ func printTableRow(style lipgloss.Style, entry *shared.DP, t shared.TestType) {
 			column{formatInt(entry.RMSH), headerSlice[RMSH].width},
 			column{formatInt(entry.RMSL), headerSlice[RMSL].width},
 			column{formatInt(entry.TTFBH), headerSlice[TTFBH].width},
-			column{formatInt(entry.TTFBL), headerSlice[TTFBH].width},
+			column{formatInt(entry.TTFBL), headerSlice[TTFBL].width},
 			column{shared.BWToString(entry.TX), headerSlice[TX].width},
 			column{formatUint(entry.TXCount), headerSlice[TXCount].width},
 			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
@@ -303,7 +320,21 @@ func printTableRow(style lipgloss.Style, entry *shared.DP, t shared.TestType) {
 	}
 }
 
-func collectDataPointv2(r *shared.DataReponseToClient) {
+// ingest folds a batch into the live aggregate and, when retention is on, into
+// the data point slice. Callers must hold responseLock.
+func ingest(host string, r *shared.DataReponseToClient) {
+	for i := range r.DPS {
+		liveAggregate.add(host, r.DPS[i])
+	}
+	liveAggregate.addErrors(len(r.Errors))
+
+	if retainDPS {
+		responseDPS = append(responseDPS, r.DPS...)
+	}
+	responseERR = append(responseERR, r.Errors...)
+}
+
+func collectDataPointv2(host string, r *shared.DataReponseToClient) {
 	if r == nil {
 		return
 	}
@@ -311,11 +342,10 @@ func collectDataPointv2(r *shared.DataReponseToClient) {
 	responseLock.Lock()
 	defer responseLock.Unlock()
 
-	responseDPS = append(responseDPS, r.DPS...)
-	responseERR = append(responseERR, r.Errors...)
+	ingest(host, r)
 }
 
-func printAndCollectDataPoints(r *shared.DataReponseToClient, c *shared.Config) {
+func printAndCollectDataPoints(host string, r *shared.DataReponseToClient, c *shared.Config) {
 	if r == nil {
 		return
 	}
@@ -329,8 +359,8 @@ func printAndCollectDataPoints(r *shared.DataReponseToClient, c *shared.Config) 
 		c.TestType = r.DPS[0].Type
 	}
 	grew := growHostColumns(r.DPS)
-	if len(responseDPS) > 0 {
-		if grew || len(responseDPS)%10 == 0 {
+	if printedRows > 0 {
+		if grew || printedRows%10 == 0 {
 			printDataPointHeaders(c.TestType)
 		}
 	} else {
@@ -343,15 +373,20 @@ func printAndCollectDataPoints(r *shared.DataReponseToClient, c *shared.Config) 
 		r.DPS[i].Received = time.Now()
 		entry := r.DPS[i]
 		printTableRow(BaseStyle, &entry, entry.Type)
+		printedRows++
 	}
 
 	for i := range r.Errors {
 		PrintTError(r.Errors[i])
 	}
 
-	responseDPS = append(responseDPS, r.DPS...)
-	responseERR = append(responseERR, r.Errors...)
+	ingest(host, r)
 }
+
+// printedRows counts rows emitted by the attached-client view. It used to be
+// derived from len(responseDPS), which stops being a row count as soon as
+// retention is off. Guarded by responseLock.
+var printedRows int
 
 // Helper functions to format int/uint values for table display
 func formatInt(val int64) string {

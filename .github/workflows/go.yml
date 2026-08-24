@@ -31,6 +31,21 @@ jobs:
     - name: Vet
       run: go vet ./...
       shell: bash
+    - name: Lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        args: --timeout 5m
     - name: Test
-      run: go test -race ./...
+      run: go test -race -count 1 -timeout 10m ./...
+      shell: bash
+    # The concurrency fixes are the kind that pass once and fail on the tenth
+    # run, and single-proc scheduling exposes different interleavings.
+    - name: Test concurrency repeatedly
+      run: |
+        for procs in 1 4; do
+          GOMAXPROCS=$procs go test -race -count 10 -timeout 15m \
+            -run 'RaceFree|Concurrent|Ingest|Reclaim|Duplicate|Releases' \
+            ./server/... ./client/...
+        done
       shell: bash

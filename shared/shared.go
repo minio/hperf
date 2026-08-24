@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/netip"
 	"os"
@@ -57,6 +58,7 @@ type TestOutput struct {
 	TXC      uint64
 	TXL      uint64
 	TXH      uint64
+	TXA      uint64
 	TXT      uint64
 	RMSL     int64
 	RMSH     int64
@@ -67,6 +69,31 @@ type TestOutput struct {
 	MH       int
 	CL       int
 	CH       int
+
+	// Samples is how many data points TXL/TXH/TXA were computed from. It is
+	// not displayed, but a zero value means the throughput columns carry no
+	// measurement yet and TXA must not be divided out.
+	Samples uint64
+}
+
+// HostAverage is the per-host throughput breakdown printed once a run ends.
+// Host is the address the client dialed, which is stable even when a server
+// reports a wildcard bind address because --real-ip was not set.
+type HostAverage struct {
+	Host    string
+	Samples uint64
+	TXSum   uint64
+	TXTotal uint64
+	TXMin   uint64
+	TXMax   uint64
+}
+
+// Avg is the mean per-second throughput of one flow out of this host.
+func (h HostAverage) Avg() uint64 {
+	if h.Samples == 0 {
+		return 0
+	}
+	return h.TXSum / h.Samples
 }
 
 type (
@@ -171,6 +198,47 @@ type Config struct {
 	Sort         SortType `json:"-"`
 	Micro        bool     `json:"-"`
 	HostFilter   string   `json:"-"`
+}
+
+// maxErrorLength caps a persisted error string. Data points and errors are
+// stored one per line and read back with a bufio.Scanner, whose default token
+// limit is 64 KiB -- a pathological error chain longer than that would abort a
+// download mid-file.
+const maxErrorLength = 4 << 10
+
+func TruncateError(s string) string {
+	if len(s) <= maxErrorLength {
+		return s
+	}
+	return s[:maxErrorLength] + "... (truncated)"
+}
+
+// ValidateTestID rejects IDs that are unsafe as a filename component. The ID
+// arrives from whichever client asked for the test and is concatenated into a
+// path under --storage-path, so without this an ID of "../../x" would write
+// outside the storage directory and an empty ID would make the server's
+// cleanup glob match -- and delete -- every saved test it has.
+func ValidateTestID(id string) error {
+	if id == "" {
+		return errors.New("test id is empty")
+	}
+	if len(id) > 64 {
+		return fmt.Errorf("test id is longer than 64 characters (%d)", len(id))
+	}
+	if id == "." || id == ".." {
+		return fmt.Errorf("invalid test id (%s)", id)
+	}
+	for _, r := range id {
+		switch {
+		case r >= 'a' && r <= 'z',
+			r >= 'A' && r <= 'Z',
+			r >= '0' && r <= '9',
+			r == '-', r == '_', r == '.':
+		default:
+			return fmt.Errorf("test id (%s) may only contain letters, digits, '-', '_' and '.'", id)
+		}
+	}
+	return nil
 }
 
 func INFO(items ...any) {
@@ -292,7 +360,7 @@ func ParseHosts(hosts string, dnsServer string, family string) (list []string, e
 		}
 
 		// this is just to trip out carrage return
-		hb = bytes.Replace(hb, []byte{13}, []byte{}, -1)
+		hb = bytes.ReplaceAll(hb, []byte{13}, []byte{})
 
 		var splitLines [][]byte
 		if bytes.Contains(hb, []byte(",")) {
@@ -302,7 +370,7 @@ func ParseHosts(hosts string, dnsServer string, family string) (list []string, e
 		}
 
 		if len(splitLines) < 1 {
-			err = errors.New("Hosts within the file ( " + fs[1] + " ) should be per line or comma seperated")
+			err = errors.New("Hosts within the file ( " + fs[1] + " ) should be per line or comma separated")
 			return
 		}
 
@@ -410,19 +478,24 @@ func GetInterfaceAddresses() (list []string, err error) {
 	return
 }
 
-func WriteStructAndNewLineToFile(f *os.File, prefix FilePrefix, s interface{}) (int, error) {
+// WriteStructAndNewLine writes one record in the on-disk format: a single
+// prefix byte identifying the record type, the JSON, then a newline.
+func WriteStructAndNewLine(w io.Writer, prefix FilePrefix, s any) (int, error) {
 	outb, err := json.Marshal(s)
 	if err != nil {
 		return 0, err
 	}
-	n, err := f.Write(prefix.String())
-	if err != nil {
-		return n, err
+	total := 0
+	for _, chunk := range [][]byte{prefix.String(), outb, {10}} {
+		n, err := w.Write(chunk)
+		total += n
+		if err != nil {
+			return total, err
+		}
 	}
-	n, err = f.Write(outb)
-	if err != nil {
-		return n, err
-	}
-	n, err = f.Write([]byte{10})
-	return n, err
+	return total, nil
+}
+
+func WriteStructAndNewLineToFile(f *os.File, prefix FilePrefix, s any) (int, error) {
+	return WriteStructAndNewLine(f, prefix, s)
 }

@@ -147,24 +147,52 @@ specific DNS server:
 
 During test execution, hperf displays aggregated statistics across all servers:
 
-| Metric           | Description                                            |
-|------------------|--------------------------------------------------------|
-| `#ERR`           | Total error count across all servers                   |
-| `#TX`            | Total HTTP requests made across all servers            |
-| `TX(high/low)`   | Highest and lowest transfer rate (single server)       |
-| `RMS(high/low)`  | Longest and fastest round-trip latency (single server) |
-| `TTFB(high/low)` | Slowest and fastest time-to-first-byte (single server) |
-| `#Dropped`       | Highest count of dropped packets (single server)       |
-| `Mem(high/low)`  | Highest and lowest memory usage (single server)        |
-| `CPU(high/low)`  | Highest and lowest CPU usage (single server)           |
+| Metric           | Description                                                     |
+|------------------|-----------------------------------------------------------------|
+| `#ERR`           | Total error count across all servers                            |
+| `#TX`            | Total HTTP requests completed across all servers                |
+| `TX(max/min)`    | Highest and lowest transfer rate of any single flow             |
+| `TX(avg)`        | Mean transfer rate across every flow, over the same population   |
+| `TX(total)`      | Total bytes transferred by the whole mesh                       |
+| `RMS(high/low)`  | Longest and fastest round-trip latency (single server)          |
+| `TTFB(high/low)` | Slowest and fastest time-to-first-byte (single server)          |
+| `#Dropped`       | Packets dropped during this test, or `-1` if unavailable        |
+| `Mem(high/low)`  | Highest and lowest memory usage (single server)                 |
+| `CPU(high/low)`  | Highest and lowest CPU usage (single server)                    |
+
+A "flow" is one server's traffic to one peer, sampled once a second. `TX(max)`,
+`TX(min)` and `TX(avg)` summarize that same population, so `TX(min)` <=
+`TX(avg)` <= `TX(max)` always holds. None of the three is the aggregate
+throughput of a host or of the cluster: in a full mesh of N hosts each host
+carries N-1 flows, so a single flow's rate is roughly 1/(N-1) of what one host's
+NIC counters will show. Use `TX(total)` over the test duration, or the per-host
+table below, when comparing against `ethtool` or switch counters.
+
+`#Dropped` counts receive plus transmit drops on the interface carrying the
+test, measured from the moment the test started. It is `-1` when no counter
+could be read, which is not the same as zero. On Linux the interface is derived
+from `--real-ip`, falling back to summing every non-loopback interface.
+
+### Per-Host Throughput
+
+When a test finishes, hperf prints one row per host with that host's average,
+slowest and fastest flow rates, sorted slowest first, so a single lagging node
+is visible instead of being averaged away. Hosts averaging under half the
+fleet-wide average are highlighted.
 
 ### Post-Test Analysis
 
-After a test completes, hperf automatically analyzes results and displays percentile breakdowns:
+Latency tests (`latency` and `requests`) analyze their results automatically when
+they finish, and `analyze` reproduces the same breakdown from a saved file:
 
 - **P99 data points**: Shows the worst 1% of measurements - critical for understanding tail latency
 - **Percentile statistics**: P10, P50, P90, P99 breakdowns showing count, sum, min, average, and max values
-- Results can be sorted by any metric using `--sort` flag (e.g., `--sort RMSH` for worst round-trip times)
+- Sort with `--sort RMSH` (round-trip, the default) or `--sort TTFBH` (time to
+  first byte). Those are the only two sort keys
+
+Bandwidth tests do not produce a percentile breakdown; use the live table, the
+per-host table above, and `--print-all` or `analyze --print-stats` for the
+individual data points.
 
 ## Advanced Workflows
 
@@ -182,6 +210,15 @@ Multiple clients can monitor the same test simultaneously.
 #### Stop a Test
 ```bash
 ./hperf stop --hosts 10.10.10.{2...10} --id latency-test-1
+```
+
+#### List and Delete Saved Tests
+```bash
+# What is stored on the servers
+./hperf list --hosts 10.10.10.{2...10}
+
+# Remove one test, or every test when --id is omitted
+./hperf delete --hosts 10.10.10.{2...10} --id latency-test-1
 ```
 
 ### Analyzing Historical Results
@@ -213,9 +250,11 @@ This creates `latency-test-1.json.csv` with all data points for analysis in spre
 ### Test Examples
 
 #### High-Frequency Latency Test
-Useful for detecting intermittent network issues:
+Useful for detecting intermittent network issues. Use `requests` rather than
+`latency` when you want to control the request shape - `latency` is a fixed
+probe and does not accept these flags:
 ```bash
-./hperf latency --hosts file:./hosts --port 6000 --duration 300 \
+./hperf requests --hosts file:./hosts --port 6000 --duration 300 \
   --concurrency 1 --request-delay 50 --buffer-size 1000 --payload-size 1000
 ```
 
@@ -223,13 +262,17 @@ Useful for detecting intermittent network issues:
 Push the network to its limits:
 ```bash
 ./hperf bandwidth --hosts file:./hosts --port 6000 --duration 60 \
-  --concurrency 16 --payload-size 10000000
+  --concurrency 16
 ```
 
+`bandwidth` deliberately fixes its payload and buffer at 32000 bytes, so
+concurrency is the only knob it exposes.
+
 #### Custom Payload Optimization
-Find optimal buffer/payload sizes for your workload:
+Find optimal buffer/payload sizes for your workload. This is what `requests`
+is for:
 ```bash
-./hperf bandwidth --hosts file:./hosts --port 6000 --duration 30 \
+./hperf requests --hosts file:./hosts --port 6000 --duration 30 \
   --concurrency 8 --buffer-size 65536 --payload-size 5000000
 ```
 
@@ -237,25 +280,41 @@ Find optimal buffer/payload sizes for your workload:
 
 ### Common Flags
 
-| Flag              | Default        | Description                                                  |
-|-------------------|----------------|--------------------------------------------------------------|
-| `--hosts`         | (required)     | Target servers (comma-separated, ellipsis pattern, or file:) |
-| `--port`          | 9010           | Server port                                                  |
-| `--id`            | auto-generated | Test identifier (timestamp if not specified)                 |
-| `--duration`      | 30             | Test duration in seconds                                     |
-| `--concurrency`   | 2×CPUs         | Concurrent requests per server                               |
-| `--payload-size`  | 1000000        | Payload size in bytes                                        |
-| `--buffer-size`   | 32000          | Network buffer size in bytes                                 |
-| `--request-delay` | 0              | Delay between requests in milliseconds                       |
-| `--save`          | true           | Save test results on servers                                 |
-| `--insecure`      | false          | Use HTTP instead of HTTPS                                    |
-| `--dns-server`    | (system)       | DNS server used to resolve hostnames in `--hosts`            |
-| `--ip-family`     | auto           | Address family for hostname resolution: `auto`, `4` or `6`   |
-| `--debug`         | false          | Enable debug output                                          |
+Flags are registered per command, so not every flag is accepted everywhere. The
+"Commands" column below says where each one applies.
+
+| Flag              | Default        | Commands                | Description                                                  |
+|-------------------|----------------|-------------------------|--------------------------------------------------------------|
+| `--hosts`         | (required)     | all client commands     | Target servers (comma-separated, ellipsis pattern, or file:) |
+| `--port`          | 9010           | all client commands     | Server port                                                  |
+| `--id`            | auto-generated | all client commands     | Test identifier (timestamp if not specified)                 |
+| `--duration`      | 30             | bandwidth, latency, requests | Test duration in seconds                                |
+| `--concurrency`   | 2×CPUs         | bandwidth, requests     | Concurrent requests per server                               |
+| `--payload-size`  | 1000000        | requests                | Payload size in bytes                                        |
+| `--buffer-size`   | 32000          | requests                | Network buffer size in bytes                                 |
+| `--request-delay` | 0              | requests                | Delay between requests in milliseconds                       |
+| `--save`          | true           | bandwidth, latency, requests | Save test results on servers                            |
+| `--dns-server`    | (system)       | all client commands     | DNS server used to resolve hostnames in `--hosts`            |
+| `--ip-family`     | auto           | all client commands     | Address family for hostname resolution: `auto`, `4` or `6`   |
+| `--sort`          | RMSH           | analyze                 | Sort data points: `RMSH` or `TTFBH`                          |
+| `--insecure`      | true           | global (before command)  | Use HTTP instead of HTTPS - **on by default**                |
+| `--debug`         | false          | global (before command)  | Enable debug output                                          |
+
+`--insecure` and `--debug` are application-level flags and must appear *before*
+the subcommand: `./hperf --debug bandwidth --hosts ...`. Note that `--insecure`
+defaults to **true**, so hperf speaks plain HTTP unless you turn it off.
+
+`bandwidth` and `latency` pin their own payload, buffer and delay settings and do
+not accept those flags; `requests` is the tunable form of the latency test.
 
 ### Environment Variables
 
-All flags can be set via environment variables with `HPERF_` prefix:
+Most flags can be set via environment variables with the `HPERF_` prefix -
+`--hosts`, `--port`, `--insecure`, `--concurrency`, `--request-delay`,
+`--duration`, `--buffer-size`, `--payload-size`, `--restart-on-error`, `--save`,
+`--dns-server`, `--ip-family` and `--debug`. Output and file flags (`--id`,
+`--file`, `--sort`, `--micro`, `--print-*`, `--host-filter`) are flag-only.
+
 ```bash
 export HPERF_HOSTS="10.10.1.{1...10}"
 export HPERF_PORT="6000"
@@ -290,11 +349,17 @@ docker run -p 9010:9010 minio/hperf:latest server --address 0.0.0.0:9010
 ### For Enterprise Deployments
 
 1. **Use dedicated storage**: Specify `--storage-path` to a dedicated volume for test results
-2. **Set realistic test IDs**: Use descriptive IDs like `prod-latency-2024-01-15` for easier result management
+2. **Set realistic test IDs**: Use descriptive IDs like `prod-latency-2024-01-15` for easier result management. IDs may contain letters, digits, `-`, `_` and `.`, up to 64 characters
 3. **Configure external IPs**: Always set `--real-ip` when servers have multiple interfaces
 4. **Plan for scale**: Long tests with many servers generate significant data - monitor disk usage
 5. **Network isolation**: Run tests on a dedicated management network when possible
 6. **Automate analysis**: Use `--file` with `analyze` and `csv` commands to integrate with monitoring systems
+7. **Size server memory for the mesh**: a full mesh opens `(hosts - 1) x concurrency` inbound connections per
+   server, each costing roughly 90 KiB of RSS. Budget about
+   `(hosts - 1) x concurrency x 90 KiB` plus ~50 MiB of baseline - for example
+   ~750 MiB at 64 hosts with `--concurrency 128`, or ~3 GiB at 256 hosts. Lower
+   `--concurrency` if that does not fit; note that changing it changes the
+   workload, so keep it pinned when comparing runs over time
 
 ### For Development and Testing
 
@@ -324,6 +389,14 @@ docker run -p 9010:9010 minio/hperf:latest server --address 0.0.0.0:9010
 ### High error counts
 **Symptom**: `#ERR` column shows many errors
 **Solution**: Check server logs with `--debug`, verify network stability, reduce `--concurrency` or increase `--request-delay`
+
+### Some hosts were excluded from the test
+**Symptom**: A warning naming hosts that did not answer, and a smaller mesh than configured
+**Solution**: The run continues with the hosts that connected rather than aborting. Check that the named hosts are running and reachable on `--port`; their absence lowers `TX(total)` proportionally
+
+### Reported throughput looks far lower than NIC counters
+**Symptom**: `TX(max)` is roughly 1/(hosts-1) of what `ethtool` reports
+**Solution**: This is expected. `TX(max/min/avg)` describe a single flow between one pair of hosts, not a host's or the cluster's aggregate. Compare `TX(total)` over the test duration, or use the per-host table printed when the test finishes
 
 ## License
 

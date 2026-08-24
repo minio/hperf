@@ -1,27 +1,44 @@
-linters-settings:
-  golint:
-    min-confidence: 0
-
-  misspell:
-    locale: US
+# Migrated to the v2 schema. The previous config was pinned to
+# golangci-lint 1.20.0 and enabled deadcode, structcheck, golint and gosimple,
+# all of which have since been removed or folded into other linters -- so
+# `golangci-lint run` failed outright on any current release and the lint gate
+# documented in CLAUDE.md was never actually running.
+version: "2"
 
 linters:
-  disable-all: true
+  default: none
   enable:
-    - typecheck
-    - goimports
-    - misspell
     - govet
-    - golint
     - ineffassign
-    - gosimple
-    - deadcode
-    - structcheck
+    - misspell
+    - staticcheck
+    - unused
+    # Unchecked writes and closes are how the descriptor and connection leaks
+    # in this codebase stayed invisible.
+    - bodyclose
+    - errorlint
+    - unconvert
+    - usestdlibvars
+
+  settings:
+    misspell:
+      locale: US
+
+  exclusions:
+    presets:
+      - comments
+    rules:
+      # hperf's error strings are capitalized throughout and surface directly
+      # in the CLI output; that is a deliberate house style, not a defect.
+      - text: "error strings should not be capitalized"
+        linters:
+          - staticcheck
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
 issues:
-  exclude-use-default: false
-  exclude:
-      - should have a package comment
-      - error strings should not be capitalized or end with punctuation or a newline
-service:
-  golangci-lint-version: 1.20.0 # use the fixed version to not introduce new linters unexpectedly
+  max-issues-per-linter: 0
+  max-same-issues: 0

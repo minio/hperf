@@ -19,8 +19,6 @@ package main
 
 import (
 	"github.com/minio/cli"
-	"github.com/minio/hperf/client"
-	"github.com/minio/hperf/shared"
 )
 
 var requestsCMD = cli.Command{
@@ -64,17 +62,4 @@ EXAMPLES:
   4. Run a high throughput test with 1MB payload size:
    {{.Prompt}} {{.HelpName}} --hosts 10.10.10.1,10.10.10.2 --request-delay 0 --concurrency 10 --payload-size 1000000
 `,
-}
-
-func runRequests(ctx *cli.Context) error {
-	config, err := parseConfig(ctx)
-	if err != nil {
-		return cli.NewExitError(err.Error(), 1)
-	}
-	config.TestType = shared.RequestTest
-	err = client.RunTest(GlobalContext, *config)
-	if err != nil {
-		return cli.NewExitError(err.Error(), 1)
-	}
-	return nil
 }
