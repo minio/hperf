@@ -20,6 +20,7 @@ package client
 import (
 	"fmt"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -69,12 +70,62 @@ const (
 	header_length
 )
 
+// The two host columns are the only header widths that change after init: they
+// grow to fit the longest address seen. They are read by the end-of-run summary
+// while reader goroutines may still be widening them, and growHostColumns is
+// called both under responseLock and outside it, so they live outside
+// headerSlice as atomics. Every other entry in headerSlice is immutable once
+// init has run, which is what makes reading the rest without synchronization
+// safe.
+var (
+	localColWidth  atomic.Int64
+	remoteColWidth atomic.Int64
+)
+
 // Headers are built once at package init. They used to be built lazily on the
 // first data point, from whichever goroutine got there first, while the live
 // ticker goroutine was already reading widths -- a race, and one that produced
 // an unpadded row if a tick landed before any data point.
 func init() {
+	resetHeaders()
+}
+
+// resetHeaders builds the static table and seeds the two mutable widths from
+// it. Tests use it to get back to a known state; nothing else should.
+func resetHeaders() {
 	initHeaders()
+	// Seed from the static table, not via colWidth: the atomics are what
+	// colWidth reads for these two fields, and they are still zero here.
+	localColWidth.Store(int64(headerSlice[Local].width))
+	remoteColWidth.Store(int64(headerSlice[Remote].width))
+}
+
+// colWidth returns the render width of a header field, reading the two mutable
+// host columns atomically. Always use this rather than headerSlice[f].width.
+func colWidth(f HeaderField) int {
+	switch f {
+	case Local:
+		return int(localColWidth.Load())
+	case Remote:
+		return int(remoteColWidth.Load())
+	default:
+		return headerSlice[f].width
+	}
+}
+
+// growTo widens w to at least n and reports whether it changed it. The compare
+// and swap matters: growHostColumns has more than one caller and they are not
+// all under the same lock, so a plain load-then-store could drop a widening.
+func growTo(w *atomic.Int64, n int) bool {
+	for {
+		cur := w.Load()
+		if int64(n) <= cur {
+			return false
+		}
+		if w.CompareAndSwap(cur, int64(n)) {
+			return true
+		}
+	}
 }
 
 func initHeaders() {
@@ -108,18 +159,14 @@ func initHeaders() {
 	headerSlice[Samples] = header{"#Samples", 9}
 }
 
-// growHostColumns widens the two host columns to fit the addresses seen so
-// far. Callers must hold responseLock: these are the only header entries that
-// change after init, and the per-data-point table is rendered from the same
-// lock-holding paths.
+// growHostColumns widens the two host columns to fit the addresses seen so far,
+// and reports whether either changed so the caller can reprint the header.
 func growHostColumns(dps []shared.DP) (grew bool) {
 	for i := range dps {
-		if w := len(shared.HostOnly(dps[i].Local)); w > headerSlice[Local].width {
-			headerSlice[Local].width = w
+		if growTo(&localColWidth, len(shared.HostOnly(dps[i].Local))) {
 			grew = true
 		}
-		if w := len(shared.HostOnly(dps[i].Remote)); w > headerSlice[Remote].width {
-			headerSlice[Remote].width = w
+		if growTo(&remoteColWidth, len(shared.HostOnly(dps[i].Remote))) {
 			grew = true
 		}
 	}
@@ -157,8 +204,7 @@ func printHeader(fields []HeaderField) {
 	fs := GenerateFormatString(len(fields))
 	hs := make([]any, 0)
 	for i := range fields {
-		h := headerSlice[fields[i]]
-		hs = append(hs, h.width, h.label)
+		hs = append(hs, colWidth(fields[i]), headerSlice[fields[i]].label)
 	}
 
 	fmt.Println(HeaderStyle.Render(fmt.Sprintf(fs, hs...)))
@@ -246,37 +292,37 @@ func printRealTimeRow(style lipgloss.Style, entry *shared.TestOutput, t shared.T
 	case shared.StreamTest:
 		PrintColumns(
 			style,
-			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
-			column{formatUint(entry.TXC), headerSlice[TXCount].width},
-			column{shared.BWToString(entry.TXH), headerSlice[TXH].width},
-			column{shared.BWToString(entry.TXL), headerSlice[TXL].width},
-			column{shared.BWToString(entry.TXA), headerSlice[TXA].width},
-			column{shared.BToString(entry.TXT), headerSlice[TXT].width},
-			column{formatInt(int64(entry.DP)), headerSlice[DroppedPackets].width},
-			column{formatInt(int64(entry.MH)), headerSlice[MemoryHigh].width},
-			column{formatInt(int64(entry.ML)), headerSlice[MemoryLow].width},
-			column{formatInt(int64(entry.CH)), headerSlice[CPUHigh].width},
-			column{formatInt(int64(entry.CL)), headerSlice[CPULow].width},
+			column{formatInt(int64(entry.ErrCount)), colWidth(ErrCount)},
+			column{formatUint(entry.TXC), colWidth(TXCount)},
+			column{shared.BWToString(entry.TXH), colWidth(TXH)},
+			column{shared.BWToString(entry.TXL), colWidth(TXL)},
+			column{shared.BWToString(entry.TXA), colWidth(TXA)},
+			column{shared.BToString(entry.TXT), colWidth(TXT)},
+			column{formatInt(int64(entry.DP)), colWidth(DroppedPackets)},
+			column{formatInt(int64(entry.MH)), colWidth(MemoryHigh)},
+			column{formatInt(int64(entry.ML)), colWidth(MemoryLow)},
+			column{formatInt(int64(entry.CH)), colWidth(CPUHigh)},
+			column{formatInt(int64(entry.CL)), colWidth(CPULow)},
 		)
 		return
 	case shared.RequestTest:
 		PrintColumns(
 			style,
-			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
-			column{formatUint(entry.TXC), headerSlice[TXCount].width},
-			column{shared.BWToString(entry.TXH), headerSlice[TXH].width},
-			column{shared.BWToString(entry.TXL), headerSlice[TXL].width},
-			column{shared.BWToString(entry.TXA), headerSlice[TXA].width},
-			column{shared.BToString(entry.TXT), headerSlice[TXT].width},
-			column{formatInt(entry.RMSH), headerSlice[RMSH].width},
-			column{formatInt(entry.RMSL), headerSlice[RMSL].width},
-			column{formatInt(entry.TTFBH), headerSlice[TTFBH].width},
-			column{formatInt(entry.TTFBL), headerSlice[TTFBL].width},
-			column{formatInt(int64(entry.DP)), headerSlice[DroppedPackets].width},
-			column{formatInt(int64(entry.MH)), headerSlice[MemoryHigh].width},
-			column{formatInt(int64(entry.ML)), headerSlice[MemoryLow].width},
-			column{formatInt(int64(entry.CH)), headerSlice[CPUHigh].width},
-			column{formatInt(int64(entry.CL)), headerSlice[CPULow].width},
+			column{formatInt(int64(entry.ErrCount)), colWidth(ErrCount)},
+			column{formatUint(entry.TXC), colWidth(TXCount)},
+			column{shared.BWToString(entry.TXH), colWidth(TXH)},
+			column{shared.BWToString(entry.TXL), colWidth(TXL)},
+			column{shared.BWToString(entry.TXA), colWidth(TXA)},
+			column{shared.BToString(entry.TXT), colWidth(TXT)},
+			column{formatInt(entry.RMSH), colWidth(RMSH)},
+			column{formatInt(entry.RMSL), colWidth(RMSL)},
+			column{formatInt(entry.TTFBH), colWidth(TTFBH)},
+			column{formatInt(entry.TTFBL), colWidth(TTFBL)},
+			column{formatInt(int64(entry.DP)), colWidth(DroppedPackets)},
+			column{formatInt(int64(entry.MH)), colWidth(MemoryHigh)},
+			column{formatInt(int64(entry.ML)), colWidth(MemoryLow)},
+			column{formatInt(int64(entry.CH)), colWidth(CPUHigh)},
+			column{formatInt(int64(entry.CL)), colWidth(CPULow)},
 		)
 	default:
 		shared.DEBUG("Unknown test type, not printing table")
@@ -288,32 +334,32 @@ func printTableRow(style lipgloss.Style, entry *shared.DP, t shared.TestType) {
 	case shared.StreamTest:
 		PrintColumns(
 			style,
-			column{entry.Created.Format("15:04:05"), headerSlice[Created].width},
-			column{shared.HostOnly(entry.Local), headerSlice[Local].width},
-			column{shared.HostOnly(entry.Remote), headerSlice[Remote].width},
-			column{shared.BWToString(entry.TX), headerSlice[TX].width},
-			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
-			column{formatInt(int64(entry.DroppedPackets)), headerSlice[DroppedPackets].width},
-			column{formatInt(int64(entry.MemoryUsedPercent)), headerSlice[MemoryUsage].width},
-			column{formatInt(int64(entry.CPUUsedPercent)), headerSlice[CPUUsage].width},
+			column{entry.Created.Format("15:04:05"), colWidth(Created)},
+			column{shared.HostOnly(entry.Local), colWidth(Local)},
+			column{shared.HostOnly(entry.Remote), colWidth(Remote)},
+			column{shared.BWToString(entry.TX), colWidth(TX)},
+			column{formatInt(int64(entry.ErrCount)), colWidth(ErrCount)},
+			column{formatInt(int64(entry.DroppedPackets)), colWidth(DroppedPackets)},
+			column{formatInt(int64(entry.MemoryUsedPercent)), colWidth(MemoryUsage)},
+			column{formatInt(int64(entry.CPUUsedPercent)), colWidth(CPUUsage)},
 		)
 		return
 	case shared.RequestTest:
 		PrintColumns(
 			style,
-			column{entry.Created.Format("15:04:05"), headerSlice[Created].width},
-			column{shared.HostOnly(entry.Local), headerSlice[Local].width},
-			column{shared.HostOnly(entry.Remote), headerSlice[Remote].width},
-			column{formatInt(entry.RMSH), headerSlice[RMSH].width},
-			column{formatInt(entry.RMSL), headerSlice[RMSL].width},
-			column{formatInt(entry.TTFBH), headerSlice[TTFBH].width},
-			column{formatInt(entry.TTFBL), headerSlice[TTFBL].width},
-			column{shared.BWToString(entry.TX), headerSlice[TX].width},
-			column{formatUint(entry.TXCount), headerSlice[TXCount].width},
-			column{formatInt(int64(entry.ErrCount)), headerSlice[ErrCount].width},
-			column{formatInt(int64(entry.DroppedPackets)), headerSlice[DroppedPackets].width},
-			column{formatInt(int64(entry.MemoryUsedPercent)), headerSlice[MemoryUsage].width},
-			column{formatInt(int64(entry.CPUUsedPercent)), headerSlice[CPUUsage].width},
+			column{entry.Created.Format("15:04:05"), colWidth(Created)},
+			column{shared.HostOnly(entry.Local), colWidth(Local)},
+			column{shared.HostOnly(entry.Remote), colWidth(Remote)},
+			column{formatInt(entry.RMSH), colWidth(RMSH)},
+			column{formatInt(entry.RMSL), colWidth(RMSL)},
+			column{formatInt(entry.TTFBH), colWidth(TTFBH)},
+			column{formatInt(entry.TTFBL), colWidth(TTFBL)},
+			column{shared.BWToString(entry.TX), colWidth(TX)},
+			column{formatUint(entry.TXCount), colWidth(TXCount)},
+			column{formatInt(int64(entry.ErrCount)), colWidth(ErrCount)},
+			column{formatInt(int64(entry.DroppedPackets)), colWidth(DroppedPackets)},
+			column{formatInt(int64(entry.MemoryUsedPercent)), colWidth(MemoryUsage)},
+			column{formatInt(int64(entry.CPUUsedPercent)), colWidth(CPUUsage)},
 		)
 	default:
 		shared.DEBUG("Unknown test type, not printing table")

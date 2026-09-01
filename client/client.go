@@ -141,6 +141,22 @@ func (c *wsClient) release() {
 	}
 }
 
+// reportReady announces this host's connect outcome to initializeClient.
+//
+// The send must not block. initializeClient drains this channel exactly
+// len(hosts) times and then abandons it, while the reconnect path re-enters
+// handleWSConnection with fresh locals -- so a blocking send would eventually
+// fill the buffer and park the reader goroutine here, before its read loop,
+// silently dropping that host from the results with nothing left to notice.
+// Duplicate reports are harmless: initializeClient ignores a host that has
+// already reported.
+func (c *wsClient) reportReady(ready chan connectResult, err error) {
+	select {
+	case ready <- connectResult{id: c.ID, err: err}:
+	default:
+	}
+}
+
 // filterSelf removes every entry matching self, not just the first. A host
 // listed twice used to leave one copy behind, so a server would test against
 // itself through the local network stack.
@@ -264,24 +280,11 @@ func handleWSConnection(ctx context.Context, c *shared.Config, socket *wsClient,
 	var err error
 	host := socket.Host
 
-	// The send is non-blocking. initializeClient drains this channel exactly
-	// len(hosts) times and then abandons it, and the reconnect path re-enters
-	// this function with a fresh set of locals -- so a blocking send would
-	// eventually fill the buffer and park here forever, before the read loop,
-	// silently dropping the host from the results. Duplicate reports are
-	// harmless: initializeClient ignores any host that already reported.
-	signalReady := func(e error) {
-		select {
-		case ready <- connectResult{id: socket.ID, err: e}:
-		default:
-		}
-	}
-
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println(r, string(debug.Stack()))
 		}
-		signalReady(err)
+		socket.reportReady(ready, err)
 
 		if ctx.Err() != nil {
 			socket.release()
@@ -357,7 +360,7 @@ func handleWSConnection(ctx context.Context, c *shared.Config, socket *wsClient,
 	// Count the host only once it is actually up, so the counter is only ever
 	// decremented by a host that contributed to it.
 	socket.hold()
-	signalReady(nil)
+	socket.reportReady(ready, nil)
 
 	// A reconnected socket is unknown to the test already running on the
 	// server, so it would receive neither data points nor -- the part that
@@ -654,9 +657,9 @@ func ListTests(ctx context.Context, c shared.Config) (err error) {
 	for i := range keys {
 		PrintColumns(
 			tableStyle,
-			column{strconv.Itoa(i), headerSlice[IntNumber].width},
-			column{keys[i], headerSlice[ID].width},
-			column{testList[keys[i]].Time.Format("02/01/2006 3:04 PM"), headerSlice[ID].width},
+			column{strconv.Itoa(i), colWidth(IntNumber)},
+			column{keys[i], colWidth(ID)},
+			column{testList[keys[i]].Time.Format("02/01/2006 3:04 PM"), colWidth(ID)},
 		)
 	}
 
@@ -739,21 +742,29 @@ func DownloadTest(ctx context.Context, c shared.Config) (err error) {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	// Close is reported rather than discarded: this function's whole purpose is
+	// to leave a correct file on disk, and a deferred write can fail at Close
+	// even after Flush succeeded.
+	defer func() {
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
 
 	w := bufio.NewWriter(f)
 	for i := range dps {
-		if _, err := shared.WriteStructAndNewLine(w, shared.DataPoint, dps[i]); err != nil {
+		if _, err = shared.WriteStructAndNewLine(w, shared.DataPoint, dps[i]); err != nil {
 			return err
 		}
 	}
 	for i := range errs {
-		if _, err := shared.WriteStructAndNewLine(w, shared.ErrorPoint, errs[i]); err != nil {
+		if _, err = shared.WriteStructAndNewLine(w, shared.ErrorPoint, errs[i]); err != nil {
 			return err
 		}
 	}
 
-	return w.Flush()
+	err = w.Flush()
+	return err
 }
 
 // snapshotResponses copies the collected data under the lock. Reading these

@@ -22,6 +22,7 @@ go install github.com/minio/hperf/cmd/hperf@latest
 ```bash
 go test -race ./...
 ```
+
 CI runs the suite with `-race`, and runs the concurrency tests repeatedly at
 `GOMAXPROCS=1` and `4`, because the locking bugs in this codebase pass a single
 clean run and fail the tenth.
@@ -30,6 +31,7 @@ clean run and fail the tenth.
 ```bash
 golangci-lint run
 ```
+
 `.golangci.yml` uses the v2 schema. It was previously pinned to golangci-lint
 1.20.0 and enabled linters that no longer exist, so this command failed outright
 and the gate never ran - if it starts erroring on a config version again, that is

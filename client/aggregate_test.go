@@ -333,40 +333,41 @@ func TestHostAccountingIsSymmetric(t *testing.T) {
 	}
 }
 
-// TestSignalReadyNeverBlocks covers the wedge in the reconnect path: the
+// TestReportReadyNeverBlocks covers the wedge in the reconnect path: the
 // readiness channel is drained a fixed number of times and then abandoned, and
-// each reconnect re-enters the handler with fresh locals, so a blocking send
-// would eventually park the goroutine before its read loop -- silently dropping
-// the host from the results with nothing left to notice.
-func TestSignalReadyNeverBlocks(t *testing.T) {
+// each reconnect re-enters the handler, so a blocking send would eventually
+// park the goroutine before its read loop -- silently dropping the host from the
+// results with nothing left to notice.
+//
+// This calls the production wsClient.reportReady. An earlier version of this
+// test declared its own copy of the closure, which meant it would have passed
+// against the blocking implementation it was supposed to be guarding.
+func TestReportReadyNeverBlocks(t *testing.T) {
 	// One host, so the buffer is one deep, and drain it as initializeClient
 	// would.
 	ready := make(chan connectResult, 1)
 	socket := &wsClient{ID: 0, Host: "10.0.0.1"}
 
-	signalReady := func(e error) {
-		select {
-		case ready <- connectResult{id: socket.ID, err: e}:
-		default:
-		}
+	socket.reportReady(ready, nil)
+	got := <-ready
+	if got.id != socket.ID || got.err != nil {
+		t.Fatalf("first report = %+v, want id 0 and no error", got)
 	}
 
-	signalReady(nil)
-	<-ready
-
-	// Every subsequent report models one reconnect generation. None may block.
+	// Every subsequent report models one reconnect generation against a channel
+	// nobody is draining any more. None may block.
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		for i := 0; i < maxReconnects+5; i++ {
-			signalReady(errors.New("flap"))
+			socket.reportReady(ready, errors.New("flap"))
 		}
 	}()
 
 	select {
 	case <-done:
 	case <-time.After(5 * time.Second):
-		t.Fatal("signalReady blocked; a reconnecting host would be dropped from the run")
+		t.Fatal("reportReady blocked; a reconnecting host would be dropped from the run")
 	}
 }
 

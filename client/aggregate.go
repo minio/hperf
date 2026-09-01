@@ -255,12 +255,12 @@ func printHostAverages(hosts []shared.HostAverage, fleet uint64) {
 		}
 		PrintColumns(
 			style,
-			column{h.Host, headerSlice[Local].width},
-			column{shared.BWToString(h.Avg()), headerSlice[TXA].width},
-			column{shared.BWToString(h.TXMin), headerSlice[TXL].width},
-			column{shared.BWToString(h.TXMax), headerSlice[TXH].width},
-			column{shared.BToString(h.TXTotal), headerSlice[TXT].width},
-			column{formatUint(h.Samples), headerSlice[Samples].width},
+			column{h.Host, colWidth(Local)},
+			column{shared.BWToString(h.Avg()), colWidth(TXA)},
+			column{shared.BWToString(h.TXMin), colWidth(TXL)},
+			column{shared.BWToString(h.TXMax), colWidth(TXH)},
+			column{shared.BToString(h.TXTotal), colWidth(TXT)},
+			column{formatUint(h.Samples), colWidth(Samples)},
 		)
 	}
 	fmt.Println("")

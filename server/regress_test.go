@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -313,6 +314,110 @@ func TestResetTestFilesIsAnchored(t *testing.T) {
 	}
 }
 
+// TestTestIDIsNotAPattern covers the second time an unanchored pattern let one
+// test reach another's files. The read and delete paths accept looser IDs than
+// newTest does, so that files written by an older server stay reachable -- but
+// they must not treat the ID as a glob. Before this, `delete --id '*'` removed
+// every saved test and `--id '[ab]*'` removed a chosen subset.
+func TestTestIDIsNotAPattern(t *testing.T) {
+	dir := t.TempDir()
+	oldBase := basePath
+	basePath = dir + string(os.PathSeparator)
+	t.Cleanup(func() { basePath = oldBase })
+
+	planted := []string{
+		"alpha.1", "beta.1", "gamma.2", "prod-latency.1",
+		// IDs an older server would have accepted but ValidateTestID would not.
+		"legacy test.1", "my@test.1",
+		// Files whose names contain metacharacters, so a pattern-matching
+		// implementation cannot pass this test by accident.
+		"star.1",
+	}
+	for _, name := range planted {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("0{}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// A metacharacter must select nothing, not everything.
+	for _, pattern := range []string{"*", "[ab]*", "?lpha", "alph[a]", "*a*"} {
+		files, err := testFiles(pattern)
+		if err != nil {
+			continue // rejecting outright is also acceptable
+		}
+		if len(files) != 0 {
+			t.Errorf("testFiles(%q) matched %v; an id must never be a pattern", pattern, files)
+		}
+	}
+
+	// Deleting through the real handler must leave everything alone.
+	sig := shared.WebsocketSignal{}
+	sig.Config.TestID = "*"
+	_ = deleteTestsFromDisk(nil, sig)
+	for _, name := range planted {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("delete --id '*' destroyed %s", name)
+		}
+	}
+
+	// Legacy IDs must still resolve, which is the whole reason this path is
+	// looser than ValidateTestID.
+	for _, id := range []string{"legacy test", "my@test", "alpha", "prod-latency"} {
+		files, err := testFiles(id)
+		if err != nil {
+			t.Errorf("testFiles(%q): %v", id, err)
+			continue
+		}
+		if len(files) != 1 {
+			t.Errorf("testFiles(%q) returned %v, want exactly one file", id, files)
+		}
+	}
+
+	// And a real delete must remove only its own test.
+	sig.Config.TestID = "alpha"
+	_ = deleteTestsFromDisk(nil, sig)
+	if _, err := os.Stat(filepath.Join(dir, "alpha.1")); !os.IsNotExist(err) {
+		t.Error("alpha.1 should have been deleted")
+	}
+	for _, name := range planted[1:] {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("deleting alpha also removed %s", name)
+		}
+	}
+}
+
+// TestTestIDSuffixAttribution: files are <id>.<index>, so "my_test" must not
+// claim "my_test.1.1" -- that belongs to the test named "my_test.1". The old
+// glob of id+".*" did claim it.
+func TestTestIDSuffixAttribution(t *testing.T) {
+	dir := t.TempDir()
+	oldBase := basePath
+	basePath = dir + string(os.PathSeparator)
+	t.Cleanup(func() { basePath = oldBase })
+
+	for _, name := range []string{"my_test.1", "my_test.1.1", "my_test.notanindex"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("0{}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	outer, err := testFiles("my_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(outer) != 1 || filepath.Base(outer[0]) != "my_test.1" {
+		t.Errorf(`testFiles("my_test") = %v, want just my_test.1`, outer)
+	}
+
+	inner, err := testFiles("my_test.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(inner) != 1 || filepath.Base(inner[0]) != "my_test.1.1" {
+		t.Errorf(`testFiles("my_test.1") = %v, want just my_test.1.1`, inner)
+	}
+}
+
 // TestUnsafeTestIDRejected keeps a client-supplied id from escaping the storage
 // directory, and keeps an empty id from matching every saved test.
 func TestUnsafeTestIDRejected(t *testing.T) {
@@ -367,7 +472,7 @@ func TestStreamOneTestFileClosesFile(t *testing.T) {
 // release the connection and each failure burned an fd and two goroutines.
 func TestNonOKResponseReleasesConnection(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io_Copy_Discard(r)
+		_, _ = drainBody(r)
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
 	defer srv.Close()
@@ -415,15 +520,20 @@ func TestNonOKResponseReleasesConnection(t *testing.T) {
 	}
 }
 
-func io_Copy_Discard(r *http.Request) (int64, error) {
+// drainBody reads a request body to completion. A clean end is io.EOF; anything
+// else is returned, so a truncated or reset body is distinguishable from success.
+func drainBody(r *http.Request) (int64, error) {
 	defer r.Body.Close()
 	buf := make([]byte, 32*1024)
 	var total int64
 	for {
 		n, err := r.Body.Read(buf)
 		total += int64(n)
-		if err != nil {
+		if errors.Is(err, io.EOF) {
 			return total, nil
+		}
+		if err != nil {
+			return total, err
 		}
 	}
 }

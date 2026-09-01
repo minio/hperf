@@ -150,7 +150,7 @@ During test execution, hperf displays aggregated statistics across all servers:
 | Metric           | Description                                                     |
 |------------------|-----------------------------------------------------------------|
 | `#ERR`           | Total error count across all servers                            |
-| `#TX`            | Total HTTP requests completed across all servers                |
+| `#TX`            | Requests issued, summed across servers (see note below)         |
 | `TX(max/min)`    | Highest and lowest transfer rate of any single flow             |
 | `TX(avg)`        | Mean transfer rate across every flow, over the same population   |
 | `TX(total)`      | Total bytes transferred by the whole mesh                       |
@@ -165,8 +165,19 @@ A "flow" is one server's traffic to one peer, sampled once a second. `TX(max)`,
 `TX(avg)` <= `TX(max)` always holds. None of the three is the aggregate
 throughput of a host or of the cluster: in a full mesh of N hosts each host
 carries N-1 flows, so a single flow's rate is roughly 1/(N-1) of what one host's
-NIC counters will show. Use `TX(total)` over the test duration, or the per-host
-table below, when comparing against `ethtool` or switch counters.
+NIC counters will show.
+
+`TX(total)` is the byte total for the **whole mesh**, so
+`TX(total) / duration` is the cluster-wide aggregate rate. To compare against
+one host's `ethtool` or switch counters, divide again by the number of reporting
+hosts — or read that host's row straight off the per-host table below, which is
+already per-host.
+
+`#TX` counts requests *issued*, not completed, and it is a sum of each server's
+running total across every data point — so treat it as a relative indicator of
+load, not as a request count. For a bandwidth test a request is a single
+long-lived stream that only ends when the test does, so the figure tracks
+in-flight streams rather than completed work.
 
 `#Dropped` counts receive plus transmit drops on the interface carrying the
 test, measured from the moment the test started. It is `-1` when no counter

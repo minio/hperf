@@ -29,39 +29,64 @@ import (
 	"github.com/minio/hperf/shared"
 )
 
-// testGlob builds the pattern matching one test's files.
+// testFiles returns the on-disk files belonging to one test.
 //
 // Read and delete paths deliberately do NOT apply shared.ValidateTestID: files
-// already on disk may have been written by an older server under no rules at
-// all, and rejecting them here would leave a long-lived server pod listing
-// tests it then refuses to serve or remove. The property that actually matters
-// is that the pattern cannot escape the storage directory, which is what this
-// checks. ValidateTestID still governs IDs that become NEW paths, in newTest.
-func testGlob(id string) (string, error) {
+// already on disk may have been written by an older server under looser rules,
+// and rejecting them here would leave a long-lived server pod listing tests it
+// then refuses to serve or remove.
+//
+// They must not glob, though. An ID handed to filepath.Glob is a *pattern*, so
+// "*" matched every test's files and "[ab]*" matched a chosen subset -- which
+// made `delete --id '*'` destroy every saved test, the same failure as the
+// unanchored pattern in resetTestFiles. Matching directory entries by exact
+// prefix has no pattern semantics, so a metacharacter in an ID is just a
+// character.
+//
+// The suffix must be the numeric index newTestFile assigns. That has always
+// been the format, so it costs no legacy compatibility, and it stops "my_test"
+// from claiming "my_test.1.1" -- which belongs to the test named "my_test.1".
+func testFiles(id string) ([]string, error) {
 	if id == "" {
-		return "", errors.New("test id is empty")
+		return nil, errors.New("test id is empty")
 	}
-	base := filepath.Clean(basePath)
-	pattern := filepath.Join(base, id+".*")
-	// Join cleans its result, so an id carrying a separator or ".." moves the
-	// pattern out of the storage directory and its parent stops being base.
-	if filepath.Dir(pattern) != base {
-		return "", fmt.Errorf("invalid test id (%s)", id)
+	// An entry name can never contain a separator, so these could only ever
+	// match nothing; rejecting them gives a clearer answer than silence.
+	if strings.ContainsRune(id, '/') || strings.ContainsRune(id, os.PathSeparator) ||
+		id == "." || id == ".." {
+		return nil, fmt.Errorf("invalid test id (%s)", id)
 	}
-	return pattern, nil
+
+	entries, err := os.ReadDir(basePath)
+	if err != nil {
+		// A missing storage directory simply holds no tests, which is what the
+		// previous glob reported too.
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	prefix := id + "."
+	files := make([]string, 0, 4)
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasPrefix(e.Name(), prefix) {
+			continue
+		}
+		if _, convErr := strconv.Atoi(strings.TrimPrefix(e.Name(), prefix)); convErr != nil {
+			continue
+		}
+		files = append(files, filepath.Join(basePath, e.Name()))
+	}
+	return files, nil
 }
 
 func streamTestFilesToWebsocket(p *wsPeer, testID string) (err error) {
-	pattern, err := testGlob(testID)
+	files, err := testFiles(testID)
 	if err != nil {
 		return err
 	}
 
-	var files []string
-	files, err = filepath.Glob(pattern)
-	if err != nil {
-		return
-	}
 	msg := new(shared.WebsocketSignal)
 	for _, path := range files {
 		if err = streamOneTestFile(p, msg, path); err != nil {
@@ -98,8 +123,8 @@ func deleteTestsFromDisk(p *wsPeer, signal shared.WebsocketSignal) (err error) {
 	defer SendDone(p)
 
 	// An empty ID means "delete every test", which is what `hperf delete`
-	// without --id asks for. It has to return here: falling through would glob
-	// ".*" against a directory that no longer exists.
+	// without --id asks for. It has to return here: falling through would look
+	// for files under a directory that no longer exists.
 	if signal.Config.TestID == "" {
 		if err = os.RemoveAll(basePath); err != nil {
 			SendError(p, err)
@@ -107,14 +132,7 @@ func deleteTestsFromDisk(p *wsPeer, signal shared.WebsocketSignal) (err error) {
 		return
 	}
 
-	pattern, err := testGlob(signal.Config.TestID)
-	if err != nil {
-		SendError(p, err)
-		return
-	}
-
-	var files []string
-	files, err = filepath.Glob(pattern)
+	files, err := testFiles(signal.Config.TestID)
 	if err != nil {
 		SendError(p, err)
 		return
