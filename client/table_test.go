@@ -18,30 +18,90 @@
 package client
 
 import (
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/minio/hperf/shared"
 )
 
 func TestGrowHostColumns(t *testing.T) {
-	initHeaders()
+	resetHeaders()
+	t.Cleanup(resetHeaders)
 
 	if grew := growHostColumns([]shared.DP{{Local: "10.10.1.2", Remote: "10.10.1.3:9010"}}); grew {
 		t.Error("IPv4 addresses should fit the default column width")
 	}
-	if headerSlice[Local].width != 15 || headerSlice[Remote].width != 15 {
-		t.Errorf("widths changed for IPv4: local=%d remote=%d", headerSlice[Local].width, headerSlice[Remote].width)
+	if colWidth(Local) != 15 || colWidth(Remote) != 15 {
+		t.Errorf("widths changed for IPv4: local=%d remote=%d", colWidth(Local), colWidth(Remote))
 	}
 
 	v6 := "2607:6bc0:8107:432:8e91:3aff:fec5:79ee"
 	if grew := growHostColumns([]shared.DP{{Local: v6, Remote: "[" + v6 + "]:9010"}}); !grew {
 		t.Error("IPv6 addresses should widen the host columns")
 	}
-	if headerSlice[Local].width != len(v6) || headerSlice[Remote].width != len(v6) {
-		t.Errorf("widths not grown to %d: local=%d remote=%d", len(v6), headerSlice[Local].width, headerSlice[Remote].width)
+	if colWidth(Local) != len(v6) || colWidth(Remote) != len(v6) {
+		t.Errorf("widths not grown to %d: local=%d remote=%d", len(v6), colWidth(Local), colWidth(Remote))
 	}
 
 	if grew := growHostColumns([]shared.DP{{Local: "10.10.1.2", Remote: "10.10.1.3:9010"}}); grew {
 		t.Error("columns should not shrink or report a change for narrower addresses")
+	}
+}
+
+// TestHostColumnWidthIsRaceFree pins the fix for the width race: the end-of-run
+// per-host summary reads these widths outside responseLock while reader
+// goroutines are still widening them, which is reachable whenever the run ends
+// on its grace timeout. Run with -race.
+func TestHostColumnWidthIsRaceFree(t *testing.T) {
+	resetHeaders()
+	t.Cleanup(resetHeaders)
+
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+
+	// Writers, as ingest does.
+	for w := 0; w < 3; w++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			for i := 0; ; i++ {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				host := strings.Repeat("h", 10+(i+id)%40)
+				growHostColumns([]shared.DP{{Local: host, Remote: host + ":9010"}})
+			}
+		}(w)
+	}
+
+	// Readers, as the summary and the live table do.
+	for r := 0; r < 2; r++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				_ = colWidth(Local)
+				_ = colWidth(Remote)
+				_ = colWidth(TXA)
+			}
+		}()
+	}
+
+	time.Sleep(300 * time.Millisecond)
+	close(stop)
+	wg.Wait()
+
+	// Widths only ever grow, so the result must be the widest host seen.
+	if got := colWidth(Local); got < 10 {
+		t.Errorf("local width = %d, expected it to have grown", got)
 	}
 }

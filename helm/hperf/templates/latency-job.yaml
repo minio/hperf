@@ -41,10 +41,10 @@ spec:
             - "--duration"
             - "{{ .Values.latency.duration }}"
             {{- end }}
-            {{- if .Values.bandwidth.printAll }}
+            {{- if .Values.latency.printAll }}
             - "--print-all"
             {{- end }}
-            {{- if .Values.bandwidth.micro }}
+            {{- if .Values.latency.micro }}
             - "--micro"
             {{- end }}
           resources:

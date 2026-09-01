@@ -8,6 +8,11 @@ on:
     branches:
     - master
     - main
+
+# Least privilege: nothing in this job writes to the repository.
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build and test
@@ -31,6 +36,30 @@ jobs:
     - name: Vet
       run: go vet ./...
       shell: bash
+    # Built from source with this job's own Go toolchain rather than pulled as a
+    # release binary. golangci-lint refuses to run when the Go version it was
+    # built with is older than the module's go directive, and the published
+    # binaries lag Go 1.26 -- golangci-lint-action@v6 with "version: latest"
+    # installed a v1 build on Go 1.24, which could neither read the v2 config
+    # nor accept the module. Installing it here makes the two match by
+    # construction and pins an exact, tested version instead of a moving one.
+    - name: Lint
+      run: |
+        go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+        golangci-lint run --timeout 5m
+      shell: bash
     - name: Test
-      run: go test -race ./...
+      run: go test -race -count 1 -timeout 10m ./...
+      shell: bash
+    # The concurrency fixes are the kind that pass once and fail on the tenth
+    # run, and single-proc scheduling exposes different interleavings. The whole
+    # suite is repeated rather than a -run subset: a name pattern silently
+    # selects nothing when a test is renamed, and `go test -run` exits 0 in that
+    # case, so the gate would quietly stop testing anything. The full suite at
+    # -count 10 takes about 40s per GOMAXPROCS setting.
+    - name: Test repeatedly for flakiness
+      run: |
+        for procs in 1 4; do
+          GOMAXPROCS=$procs go test -race -count 10 -timeout 15m ./...
+        done
       shell: bash

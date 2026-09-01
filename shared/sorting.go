@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"cmp"
 	"slices"
 )
 
@@ -40,22 +41,19 @@ func SortDataPoints(dps []DP, c Config) {
 	}
 }
 
+// The comparators return 0 for equal elements. Returning 1 instead, as these
+// used to, breaks the strict weak ordering slices.SortFunc requires, which
+// leaves the order of tied elements undefined: two analyses of the same file
+// could disagree. Ties are common because a data point with no samples in its
+// interval reports RMSH/TTFBH of 0.
 func SortDataPointRMSH(dps []DP) {
 	slices.SortFunc(dps, func(a DP, b DP) int {
-		if a.RMSH < b.RMSH {
-			return -1
-		} else {
-			return 1
-		}
+		return cmp.Compare(a.RMSH, b.RMSH)
 	})
 }
 
 func SortDataPointTTFBH(dps []DP) {
 	slices.SortFunc(dps, func(a DP, b DP) int {
-		if a.TTFBH < b.TTFBH {
-			return -1
-		} else {
-			return 1
-		}
+		return cmp.Compare(a.TTFBH, b.TTFBH)
 	})
 }

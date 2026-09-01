@@ -61,23 +61,10 @@ func InvalidFlagValueError(value interface{}, name string) error {
 }
 
 var (
-	debug       = false
-	insecure    = false
-	globalFlags = []cli.Flag{
-		hostsFlag,
-		portFlag,
-		insecureFlag,
-		concurrencyFlag,
-		delayFlag,
-		durationFlag,
-		bufferSizeFlag,
-		payloadSizeFlag,
-		restartOnErrorFlag,
-		testIDFlag,
-		saveTestFlag,
-		dnsServerFlag,
-		ipFamilyFlag,
-	}
+	debug    = false
+	insecure = false
+	// Note: the app registers baseFlags globally; per-command flag sets are
+	// declared on each command.
 	hostsFlag = cli.StringFlag{
 		Name:   "hosts",
 		EnvVar: "HPERF_HOSTS",
@@ -250,12 +237,13 @@ func before(ctx *cli.Context) error {
 func parseConfig(ctx *cli.Context) (*shared.Config, error) {
 	shared.DebugEnabled = debug
 
+	// Concurrency 0 would build a zero-capacity semaphore with no tokens in
+	// it, so every reader goroutine would block forever and the test would
+	// report nothing at all. This fallback used to be computed and then
+	// dropped on the floor, because the config below re-read the raw flag.
 	concur := ctx.Int(concurrencyFlag.Name)
-	if concur == 0 {
+	if concur < 1 {
 		concur = max(1, runtime.NumCPU()/2)
-		if concur == 0 {
-			concur = 1
-		}
 	}
 
 	var config *shared.Config
@@ -276,7 +264,7 @@ func parseConfig(ctx *cli.Context) (*shared.Config, error) {
 		TestType:       shared.RequestTest,
 		Duration:       ctx.Int(durationFlag.Name),
 		RequestDelay:   ctx.Int(delayFlag.Name),
-		Concurrency:    ctx.Int(concurrencyFlag.Name),
+		Concurrency:    concur,
 		PayloadSize:    ctx.Int(payloadSizeFlag.Name),
 		BufferSize:     ctx.Int(bufferSizeFlag.Name),
 		Port:           ctx.String(portFlag.Name),
@@ -293,7 +281,11 @@ func parseConfig(ctx *cli.Context) (*shared.Config, error) {
 	}
 
 	switch ctx.Command.Name {
-	case "latency", "bandwidth", "http", "get":
+	// Every command that starts a test needs an ID. "requests" was missing
+	// here while "http" and "get" matched no command at all, so `hperf
+	// requests` ran with an empty TestID -- which made the server's
+	// resetTestFiles glob every file in --storage-path and delete it.
+	case "latency", "bandwidth", "requests":
 		if ctx.String("id") == "" {
 			config.TestID = strconv.Itoa(int(time.Now().Unix()))
 		}
@@ -340,7 +332,7 @@ func prettyprint(data *shared.Config, title string) {
 	}
 	fmt.Println(title, " ==============================")
 	// outData := out.Bytes()
-	fmt.Println(string(out.Bytes()))
+	fmt.Println(out.String())
 	fmt.Println("=================")
 }
 

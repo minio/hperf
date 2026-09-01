@@ -64,11 +64,22 @@ func runLatency(ctx *cli.Context) error {
 		return err
 	}
 	config.TestType = shared.RequestTest
-	config.BufferSize = 1000
-	config.PayloadSize = 1000
-	config.Concurrency = 1
-	config.RequestDelay = 200
 	config.RestartOnError = true
+
+	// The latency command is a deliberately gentle probe, so it pins a small
+	// payload, one request in flight and a delay between requests. The requests
+	// command shares this action but advertises these flags in its own help,
+	// where they were silently overwritten -- so an explicitly set flag wins
+	// and anything left alone keeps the probe default.
+	setOrDefault := func(name string, dst *int, def int) {
+		if !ctx.IsSet(name) {
+			*dst = def
+		}
+	}
+	setOrDefault(bufferSizeFlag.Name, &config.BufferSize, 1000)
+	setOrDefault(payloadSizeFlag.Name, &config.PayloadSize, 1000)
+	setOrDefault(concurrencyFlag.Name, &config.Concurrency, 1)
+	setOrDefault(delayFlag.Name, &config.RequestDelay, 200)
 
 	fmt.Println("")
 	shared.INFO(" Test ID:", config.TestID)

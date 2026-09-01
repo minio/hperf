@@ -19,66 +19,128 @@ package server
 
 import (
 	"bufio"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/gofiber/contrib/websocket"
 	"github.com/minio/hperf/shared"
 )
 
-func streamTestFilesToWebsocket(con *websocket.Conn, testID string) (err error) {
-	var files []string
-	files, err = filepath.Glob(filepath.Join(basePath, testID+".*"))
-	if err != nil {
-		return
+// testFiles returns the on-disk files belonging to one test.
+//
+// Read and delete paths deliberately do NOT apply shared.ValidateTestID: files
+// already on disk may have been written by an older server under looser rules,
+// and rejecting them here would leave a long-lived server pod listing tests it
+// then refuses to serve or remove.
+//
+// They must not glob, though. An ID handed to filepath.Glob is a *pattern*, so
+// "*" matched every test's files and "[ab]*" matched a chosen subset -- which
+// made `delete --id '*'` destroy every saved test, the same failure as the
+// unanchored pattern in resetTestFiles. Matching directory entries by exact
+// prefix has no pattern semantics, so a metacharacter in an ID is just a
+// character.
+//
+// The suffix must be the numeric index newTestFile assigns. That has always
+// been the format, so it costs no legacy compatibility, and it stops "my_test"
+// from claiming "my_test.1.1" -- which belongs to the test named "my_test.1".
+func testFiles(id string) ([]string, error) {
+	if id == "" {
+		return nil, errors.New("test id is empty")
 	}
+	// An entry name can never contain a separator, so these could only ever
+	// match nothing; rejecting them gives a clearer answer than silence.
+	if strings.ContainsRune(id, '/') || strings.ContainsRune(id, os.PathSeparator) ||
+		id == "." || id == ".." {
+		return nil, fmt.Errorf("invalid test id (%s)", id)
+	}
+
+	entries, err := os.ReadDir(basePath)
+	if err != nil {
+		// A missing storage directory simply holds no tests, which is what the
+		// previous glob reported too.
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	prefix := id + "."
+	files := make([]string, 0, 4)
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasPrefix(e.Name(), prefix) {
+			continue
+		}
+		if _, convErr := strconv.Atoi(strings.TrimPrefix(e.Name(), prefix)); convErr != nil {
+			continue
+		}
+		files = append(files, filepath.Join(basePath, e.Name()))
+	}
+	return files, nil
+}
+
+func streamTestFilesToWebsocket(p *wsPeer, testID string) (err error) {
+	files, err := testFiles(testID)
+	if err != nil {
+		return err
+	}
+
 	msg := new(shared.WebsocketSignal)
 	for _, path := range files {
-		f, err := os.Open(path)
-		if err != nil {
+		if err = streamOneTestFile(p, msg, path); err != nil {
 			return err
-		}
-		s := bufio.NewScanner(f)
-		for s.Scan() {
-			msg.Data = s.Bytes()
-			msg.SType = shared.GetTest
-			msg.Code = 200
-			err = con.WriteJSON(msg)
-			if err != nil {
-				return err
-			}
-		}
-		if s.Err() != nil {
-			return s.Err()
 		}
 	}
 
 	return nil
 }
 
-func deleteTestsFromDisk(con *websocket.Conn, signal shared.WebsocketSignal) (err error) {
-	defer SendDone(con)
+// streamOneTestFile is a separate function so the file is closed when it
+// returns. Opening inside the caller's loop leaked one descriptor per file per
+// download, for the lifetime of the server, and every error return leaked too.
+func streamOneTestFile(p *wsPeer, msg *shared.WebsocketSignal, path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
 
-	if signal.Config.TestID == "" {
-		err = os.RemoveAll(basePath)
-		if err != nil {
-			SendError(con, err)
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		msg.Data = s.Bytes()
+		msg.SType = shared.GetTest
+		msg.Code = 200
+		if err := p.writeJSON(msg); err != nil {
+			return err
 		}
 	}
+	return s.Err()
+}
 
-	var files []string
-	files, err = filepath.Glob(filepath.Join(basePath, signal.Config.TestID+".*"))
+func deleteTestsFromDisk(p *wsPeer, signal shared.WebsocketSignal) (err error) {
+	defer SendDone(p)
+
+	// An empty ID means "delete every test", which is what `hperf delete`
+	// without --id asks for. It has to return here: falling through would look
+	// for files under a directory that no longer exists.
+	if signal.Config.TestID == "" {
+		if err = os.RemoveAll(basePath); err != nil {
+			SendError(p, err)
+		}
+		return
+	}
+
+	files, err := testFiles(signal.Config.TestID)
 	if err != nil {
-		SendError(con, err)
+		SendError(p, err)
 		return
 	}
 
 	for _, path := range files {
-		err = os.Remove(path)
-		if err != nil {
-			SendError(con, err)
+		if err = os.Remove(path); err != nil {
+			SendError(p, err)
 		}
 	}
 
@@ -110,8 +172,15 @@ func listTestsFromDisk() (finalList []shared.TestInfo, err error) {
 }
 
 func resetTestFiles(t *test) (err error) {
+	if err = shared.ValidateTestID(t.ID); err != nil {
+		return
+	}
+
+	// The pattern is anchored with the separator. Without it, "--id test"
+	// matched -- and deleted -- test2.1, testing.1 and every other test whose
+	// ID merely started with "test", and an empty ID matched everything.
 	var files []string
-	files, err = filepath.Glob(filepath.Join(basePath, t.ID+"*"))
+	files, err = filepath.Glob(filepath.Join(basePath, t.ID+".*"))
 	if err != nil {
 		return
 	}
